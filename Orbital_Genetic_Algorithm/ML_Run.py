@@ -193,7 +193,7 @@ if __name__ == "__main__":
     loc_des = 100
     vel_des = 0#np.random.uniform(0,2)
     ideal_time_perc = 0.8#np.random.random()/2 + 0.5
-    t_steps = 200
+    t_steps = 50
     
     old_settings = 0
     
