@@ -131,7 +131,7 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
     goals = np.array([loc_des, vel_des, ideal_time_perc])
     
     ## Conditions to set
-    samples = 10
+    samples = 1
     gen_count = np.zeros((2,samples))
     
     for KK in range(samples):
@@ -193,9 +193,9 @@ if __name__ == "__main__":
     loc_des = 100
     vel_des = 0#np.random.uniform(0,2)
     ideal_time_perc = 0.8#np.random.random()/2 + 0.5
-    t_steps = 50
+    t_steps = 20
     
-    old_settings = 0
+    old_settings = 1
     
     filename = 'Population_ML_Gen_Final.npy'
     pop_ML = np.load(filename).item()
