@@ -214,8 +214,8 @@ def generate_children(pop, actions, selection_num, selected_pop, mutated_pop, di
         mut_num = np.random.randint(1,selection_num[4]+1,size = 1)[0]
         indices = np.random.randint(0,np.size(mutated_actions[0,:,0]), size = (np.size(mutated_actions[:,0,0]),mut_num))
         for i, mut_locs in enumerate(indices):
-#            mutated_actions[i,mut_locs,1] = np.random.uniform(0, 2*np.pi, size = mut_num)
-            mutated_actions[i,mut_locs,1] = mutated_actions[i,mut_locs,1]*np.random.uniform(1-angle_mutation, 1+angle_mutation, size = mut_num)
+            mutated_actions[i,mut_locs,1] = np.random.uniform(0, 2*np.pi, size = mut_num)
+#            mutated_actions[i,mut_locs,1] = mutated_actions[i,mut_locs,1]*np.random.uniform(1-angle_mutation, 1+angle_mutation, size = mut_num)
 #            mutated_actions[i,mut_locs,1] = np.random.randint(0, 6, size = mut_num)*60*(np.pi/180)
     
     random_selection_children_0 = np.random.randint(0,2,size = (int(len(selected_pop)/2),np.size(pop['actions'][0,:,0]),dimensions))
@@ -323,15 +323,13 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
         gen_count[1,KK] = elapsed_time
 
     gen_count_stats = np.zeros((3))
-    gen_count_stats[:2] = np.mean(gen_count,1)
+    gen_count_stats[:2] = np.median(gen_count,1)
     gen_count_stats[2] = np.sqrt(np.var(gen_count[1,:]))
     
     return gen_count_stats, pop, best_performance, acc, dt
 
 def n_d_runfile(dimensions = 1, loc_des_x = 1, loc_des_y = 1, vel_des = 1, t_steps = 1, pop_size = 1, A_l = 1, A_v = 1, A_f = 1, A_t = 1, perc_elite = 1, perc_lucky = 1, perc_mutation = 1, perc_selected = 1, mutation_chance = 1, angle_mutation = 1, samples = 1, generations = 1):
 
-#    print('HELLO')
-    dimensions = 1
     dt = 1.0
     ideal_time_perc = 0.8
     perc_elite, perc_lucky, perc_mutation, perc_selected = np.array([perc_elite, perc_lucky, perc_mutation, perc_selected])/(perc_elite + perc_lucky + perc_mutation + perc_selected)
@@ -339,19 +337,19 @@ def n_d_runfile(dimensions = 1, loc_des_x = 1, loc_des_y = 1, vel_des = 1, t_ste
     gen_count_stats, pop, best_performance, acc, dt = run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chance, pop_size, generations, t_steps, loc_des_x, loc_des_y, vel_des, ideal_time_perc, dt, dimensions, samples, angle_mutation)
     
     calculate_result(pop, acc, t_steps, dt, best_performance[2], True, dimensions)
-
+    print(gen_count_stats)
     return gen_count_stats[0]
 
 
 def fitness_ML(pop_ML):
     
-    pop_ML['score'] = np.exp(-(pop_ML['results']/1000))
+    pop_ML['score'] = np.exp(-(pop_ML['results']/100))
     
     return pop_ML
 
 def init_population_ML(pop_ML):
     
-    pop_ML['actions'] = np.random.uniform(0.10,0.90,size = (np.shape(pop_ML['actions'])[0],np.shape(pop_ML['actions'])[1]))
+    pop_ML['actions'] = np.random.uniform(0.05,0.95,size = (np.shape(pop_ML['actions'])[0],np.shape(pop_ML['actions'])[1]))
     
     return pop_ML
 
@@ -361,12 +359,12 @@ def calculate_ML(pop_ML, current_gen, ML_settings):
     gen_stats = np.zeros((np.size(pop_ML['actions'],0)))
     pool = Pool(10)
     
-    ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_sample, ML_generations = ML_settings
+    ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations = ML_settings
   
     A = []
        
     for i in range(np.size(pop_ML['actions'],0)):
-        A.append((ML_dimensions,ML_loc_des_x,ML_loc_des_y,ML_vel_des,ML_t_steps,int(pop_ML['actions'][i,0]*ML_pop_size_max),pop_ML['actions'][i,1],pop_ML['actions'][i,2],pop_ML['actions'][i,3],pop_ML['actions'][i,4],pop_ML['actions'][i,5],pop_ML['actions'][i,6],pop_ML['actions'][i,7],pop_ML['actions'][i,8],pop_ML['actions'][i,9],pop_ML['actions'][i,10],ML_sample,ML_generations))
+        A.append((ML_dimensions,ML_loc_des_x,ML_loc_des_y,ML_vel_des,ML_t_steps,int(pop_ML['actions'][i,0]*ML_pop_size_max),pop_ML['actions'][i,1],pop_ML['actions'][i,2],pop_ML['actions'][i,3],pop_ML['actions'][i,4],pop_ML['actions'][i,5],pop_ML['actions'][i,6],pop_ML['actions'][i,7],pop_ML['actions'][i,8],pop_ML['actions'][i,9],pop_ML['actions'][i,10],ML_samples,ML_generations))
 #    print(A)
     print('Gen = %d' %(current_gen))
     gen_stats = np.zeros((np.shape(A)[0]))
@@ -383,7 +381,7 @@ def calculate_ML(pop_ML, current_gen, ML_settings):
     
     pop_ML['results'] = gen_stats
     pool.close()
-    print(np.mean(gen_stats))
+    print(np.median(gen_stats))
     
     return pop_ML
 
@@ -415,7 +413,7 @@ def generate_children_ML(pop_ML, actions, selection_num_ML, selected_pop, mutate
     mut_num = np.random.randint(1,selection_num_ML[4]+1,size = 1)[0]
     indices = np.random.randint(0,np.size(mutated_actions[0,:]), size = (np.size(mutated_actions[:,0]),mut_num))
     for i, mut_locs in enumerate(indices):
-        mutated_actions[i,mut_locs] = np.random.uniform(0.10, 0.9, size = mut_num)
+        mutated_actions[i,mut_locs] = np.random.uniform(0.05, 0.95, size = mut_num)
     
     random_selection_children_0 = np.random.randint(0,2,size = (int(len(selected_pop)/2),np.size(pop_ML['actions'][0,:])))
     random_selection_children_1 = 1 - random_selection_children_0
@@ -432,7 +430,7 @@ def generate_children_ML(pop_ML, actions, selection_num_ML, selected_pop, mutate
 
 def run_ML(generations, ML_settings, already_started = 0, pop_ML = None):
 
-    pop_size = 50
+    pop_size = 20
     t_steps = 11
     
     perc_elite = 0.10
@@ -464,9 +462,7 @@ def run_ML(generations, ML_settings, already_started = 0, pop_ML = None):
         print('Already Started, but Continuing')
     
     for I in range(generations):
-        
-#        pop_ML['actions'][:,1] = dist_to_vel_ration*pop_ML['actions'][:,2]
-#        
+              
         vel_loc_weight = (pop_ML['actions'][:,1] + pop_ML['actions'][:,2])
         bad_time_weights = pop_ML['actions'][:,4] > vel_loc_weight*time_to_locvel_ratio
         pop_ML['actions'][bad_time_weights,4] = (pop_ML['actions'][bad_time_weights,1] + pop_ML['actions'][bad_time_weights,2])*time_to_locvel_ratio
@@ -484,31 +480,43 @@ def run_ML(generations, ML_settings, already_started = 0, pop_ML = None):
 
 def start_ML_ML_optimization(generations):
            
-    ML_dimensions = 1
-    ML_loc_des_x = 100
-    ML_loc_des_y = 100*np.tan(60*np.pi/180)
-    ML_vel_des = 0
-    ML_t_steps = 50
-    ML_pop_size_max = 1000
-    ML_sample = 10
-    ML_generations = 50000
-    
-    ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_sample, ML_generations]
-    
+    change_settings = 0
     already_started = 0
+    
+    ML_dimensions = 2
+    ML_loc_des_x = 100
+    ML_loc_des_y = 0#100*np.tan(60*np.pi/180)
+    ML_vel_des = 0
+    ML_t_steps = 20
+    ML_pop_size_max = 2000
+    ML_samples = 5
+    ML_generations = 10000
+    
+    ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
     
     if already_started == 0:
         pop_ML, best_performance = run_ML(generations, ML_settings, already_started, [])
     else:
-        filename = 'ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_sample) + '_pop_' + str(ML_pop_size_max) + '_settings_1.npy'
+        
+        filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_1.npy'
         pop_ML = np.load(filename).item()
-        filename = 'ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_sample) + '_pop_' + str(ML_pop_size_max) + '_settings_2.npy'
-        ML_settings = np.load(filename).item()
+        filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_2.npy'
+        ML_settings = np.load(filename).astype(int)
+        ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations = ML_settings
+        ML_settings_temp = np.load(filename) 
+        ML_loc_des_x, ML_loc_des_y, ML_vel_des = ML_settings_temp[1:4]
+#        filename = 'Population_ML_Gen_Temp.npy'
+#        pop_ML = np.load(filename).item()
+        if change_settings == 1:
+            ML_generations = 5000
+            ML_t_steps = 100
+        
+        ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
         pop_ML, best_performance = run_ML(generations, ML_settings, already_started, pop_ML)
     
-    filename = 'ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_sample) + '_pop_' + str(ML_pop_size_max) + '_settings_1.npy'
+    filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_1.npy'
     np.save(filename, pop_ML)
-    filename = 'ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_sample) + '_pop_' + str(ML_pop_size_max) + '_settings_2.npy'
+    filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_2.npy'
     np.save(filename, ML_settings)
 
     return
@@ -518,38 +526,73 @@ if __name__ == "__main__":
     plt.close('all')
     ### Design Values
     
-    optimize_ML = 1
+    optimize_ML = 0
     generations = 100
+    already_started = 1
+    ideal_time_perc = 0.8
+    dt = 1.0
     
     if optimize_ML == 0:
     
-        dimensions = 1
-        loc_des_x = 100
-        loc_des_y = 100*np.tan(60*np.pi/180)
-        vel_des = 0
+        if already_started == 1:
+            ML_t_steps = 20
+            ML_samples = 100
+            ML_pop_size_max = 2000
+            ML_dimensions = 1
+            
+            
+            filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_1.npy'
+            pop_ML = np.load(filename).item()
+            pop_size, A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance, angle_mutation = pop_ML['actions'][0,0],pop_ML['actions'][0,1],pop_ML['actions'][0,2],pop_ML['actions'][0,3],pop_ML['actions'][0,4],pop_ML['actions'][0,5],pop_ML['actions'][0,6],pop_ML['actions'][0,7],pop_ML['actions'][0,8],pop_ML['actions'][0,9],pop_ML['actions'][0,10]
+    
+            filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_2.npy'
+            ML_settings = np.load(filename).astype(int)
+            dimensions, loc_des_x, loc_des_y, vel_des, t_steps, pop_size_max, samples, generations = ML_settings
+            ML_settings_temp = np.load(filename) 
+            loc_des_x, loc_des_y, vel_des = ML_settings_temp[1:4]
+            pop_size = int(pop_size*pop_size_max)
+            
+            
+#            t_steps = 50
+            samples = 1
+            loc_des_y = 0
+#            pop_size = 1000
+            dimensions = 2
+            generations = 10000
         
-        t_steps = 20
-        ideal_time_perc = 0.8
-        dt = 1.0
         
-        pop_size = 100
-        A_l = 0.3
-        A_v = 0.6
-        A_f = 0
-        A_t = 0.2
+        else:
+            dimensions = 1
+            loc_des_x = 100
+            loc_des_y = 100*np.tan(60*np.pi/180)
+            vel_des = 0  
+            t_steps = 20
+            
+            pop_size = 100
+            A_l = 0.3
+            A_v = 0.6
+            A_f = 0
+            A_t = 0.2
+            
+            ## Other Set Params
+            perc_elite = 0.2
+            perc_lucky = 0.15
+            perc_mutation = 0.2
+            perc_selected = 0.45
+            mutation_chance = 0.4
+            angle_mutation = 0.1
+            
+            generations = 10000
+            samples = 1
         
-        ## Other Set Params
-        perc_elite = 0.2
-        perc_lucky = 0.15
-        perc_mutation = 0.2
-        perc_selected = 0.45
-        mutation_chance = 0.4
-        angle_mutation = 0.1
-        
-        generations = 10000
-        samples = 1
-        
-        mean_generations = n_d_runfile(dimensions, loc_des_x, loc_des_y, vel_des, t_steps, pop_size, A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance, angle_mutation, samples, generations)
+        median_generations = n_d_runfile(dimensions, loc_des_x, loc_des_y, vel_des, t_steps, pop_size, A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance, angle_mutation, samples, generations)
     
     elif optimize_ML == 1:
         start_ML_ML_optimization(generations)
+        
+        
+        # Optimized 20 t_step for
+#        time [3.30000000e+01 2.30053663e-02 3.65106365e-02]
+#        generations [2.90000000e+01 5.80129623e-02 1.33688030e-02]
+#    filename = 'Population_ML_Gen_Temp.npy'
+#    pop_ML = np.load(filename).item()
