@@ -553,20 +553,20 @@ if __name__ == "__main__":
             pop_size = int(pop_size*pop_size_max)
             
             
-#            t_steps = 50
+#            t_steps = 20
             samples = 1
-            loc_des_y = 0
+#            loc_des_y = 0
 #            pop_size = 1000
             dimensions = 2
             generations = 10000
         
         
         else:
-            dimensions = 1
+            dimensions = 2
             loc_des_x = 100
             loc_des_y = 100*np.tan(60*np.pi/180)
             vel_des = 0  
-            t_steps = 20
+            t_steps = 5
             
             pop_size = 100
             A_l = 0.3
