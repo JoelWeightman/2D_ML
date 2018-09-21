@@ -33,10 +33,10 @@ def calculate_result(pop, acc, t_steps, dt, best_index, final, dimensions):
             v1[:,1:t_steps,0] = np.cumsum(pop['actions'][:,:-1]*dt*acc, axis = 1)[:,:,0]
             d1 = np.cumsum(v1*dt, axis = 1)
                 
-            plt.figure()
-            plt.scatter(np.arange(np.size(pop['actions'][0,:])),d1[best_index,:,0], s = 1, c='red')
-            plt.figure()
-            plt.scatter(np.arange(np.size(pop['actions'][0,:])),v1[best_index,:,0], s = 1,c='black')
+#            plt.figure()
+#            plt.scatter(np.arange(np.size(pop['actions'][0,:])),d1[best_index,:,0], s = 1, c='red')
+#            plt.figure()
+#            plt.scatter(np.arange(np.size(pop['actions'][0,:])),v1[best_index,:,0], s = 1,c='black')
             
             return
         
@@ -233,7 +233,7 @@ def generate_children(pop, actions, selection_num, selected_pop, mutated_pop, di
 
 def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chance, pop_size, generations, t_steps, loc_des_x, loc_des_y, vel_des, ideal_time_perc, dt, dimensions, samples, angle_mutation):
     
-    plt.close("all")
+#    plt.close("all")
     
     # Threshold Values
     thresh_loc = 0.0
@@ -324,7 +324,7 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
 
     gen_count_stats = np.zeros((3))
     gen_count_stats[:2] = np.median(gen_count,1)
-    gen_count_stats[2] = np.sqrt(np.var(gen_count[1,:]))
+    gen_count_stats[2] = np.sqrt(np.var(gen_count[0,:]))
     
     return gen_count_stats, pop, best_performance, acc, dt
 
@@ -338,7 +338,7 @@ def n_d_runfile(dimensions = 1, loc_des_x = 1, loc_des_y = 1, vel_des = 1, t_ste
     
     calculate_result(pop, acc, t_steps, dt, best_performance[2], True, dimensions)
     print(gen_count_stats)
-    return gen_count_stats[0]
+    return gen_count_stats
 
 
 def fitness_ML(pop_ML):
@@ -349,7 +349,7 @@ def fitness_ML(pop_ML):
 
 def init_population_ML(pop_ML):
     
-    pop_ML['actions'] = np.random.uniform(0.05,0.95,size = (np.shape(pop_ML['actions'])[0],np.shape(pop_ML['actions'])[1]))
+    pop_ML['actions'] = np.random.uniform(0.025,0.975,size = (np.shape(pop_ML['actions'])[0],np.shape(pop_ML['actions'])[1]))
     
     return pop_ML
 
@@ -357,7 +357,7 @@ def calculate_ML(pop_ML, current_gen, ML_settings):
     
     start_time = time.time()
     gen_stats = np.zeros((np.size(pop_ML['actions'],0)))
-    pool = Pool(10)
+    pool = Pool(5)
     
     ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations = ML_settings
   
@@ -374,7 +374,7 @@ def calculate_ML(pop_ML, current_gen, ML_settings):
 #    print(resultant_gen)
     for i, result in enumerate(pool.starmap(n_d_runfile, A)):
         print(current_gen, i, result)
-        gen_stats[i] = result
+        gen_stats[i] = result[0]
         
     elapsed_time = time.time() - start_time
     print(elapsed_time)
@@ -413,7 +413,7 @@ def generate_children_ML(pop_ML, actions, selection_num_ML, selected_pop, mutate
     mut_num = np.random.randint(1,selection_num_ML[4]+1,size = 1)[0]
     indices = np.random.randint(0,np.size(mutated_actions[0,:]), size = (np.size(mutated_actions[:,0]),mut_num))
     for i, mut_locs in enumerate(indices):
-        mutated_actions[i,mut_locs] = np.random.uniform(0.05, 0.95, size = mut_num)
+        mutated_actions[i,mut_locs] = np.random.uniform(0.025, 0.975, size = mut_num)
     
     random_selection_children_0 = np.random.randint(0,2,size = (int(len(selected_pop)/2),np.size(pop_ML['actions'][0,:])))
     random_selection_children_1 = 1 - random_selection_children_0
@@ -482,34 +482,41 @@ def start_ML_ML_optimization(generations):
            
     change_settings = 0
     already_started = 0
+    load_old_file = 1
     
-    ML_dimensions = 2
+    ML_dimensions = 1
     ML_loc_des_x = 100
     ML_loc_des_y = 0#100*np.tan(60*np.pi/180)
     ML_vel_des = 0
-    ML_t_steps = 20
+    ML_t_steps = 50
     ML_pop_size_max = 2000
-    ML_samples = 5
-    ML_generations = 10000
+    ML_samples = 10
+    ML_generations = 1000
     
     ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
     
     if already_started == 0:
         pop_ML, best_performance = run_ML(generations, ML_settings, already_started, [])
     else:
-        
-        filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_1.npy'
-        pop_ML = np.load(filename).item()
-        filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_2.npy'
-        ML_settings = np.load(filename).astype(int)
-        ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations = ML_settings
-        ML_settings_temp = np.load(filename) 
-        ML_loc_des_x, ML_loc_des_y, ML_vel_des = ML_settings_temp[1:4]
-#        filename = 'Population_ML_Gen_Temp.npy'
-#        pop_ML = np.load(filename).item()
-        if change_settings == 1:
-            ML_generations = 5000
-            ML_t_steps = 100
+        if load_old_file == 0:
+            file_base = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max)
+            filename = file_base + '_settings_1.npy'
+            pop_ML = np.load(filename).item()
+            filename = file_base + '_settings_2.npy'
+            ML_settings = np.load(filename).astype(int)
+            ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations = ML_settings
+            ML_settings_temp = np.load(filename) 
+            ML_loc_des_x, ML_loc_des_y, ML_vel_des = ML_settings_temp[1:4]
+    #        filename = 'Population_ML_Gen_Temp.npy'
+    #        pop_ML = np.load(filename).item()
+            if change_settings == 1:
+                ML_generations = 5000
+                ML_t_steps = 100
+        else:
+            file_base = '1D_100_Gens_time_ML_t_20_samp_100_pop_2000'
+            filename = file_base + '_settings_1.npy'
+            pop_ML = np.load(filename).item()
+            
         
         ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
         pop_ML, best_performance = run_ML(generations, ML_settings, already_started, pop_ML)
@@ -526,26 +533,29 @@ if __name__ == "__main__":
     plt.close('all')
     ### Design Values
     
-    optimize_ML = 0
+    optimize_ML = 1
     generations = 100
     already_started = 1
     ideal_time_perc = 0.8
     dt = 1.0
     
+    
     if optimize_ML == 0:
     
         if already_started == 1:
-            ML_t_steps = 20
-            ML_samples = 100
-            ML_pop_size_max = 2000
+            ML_t_steps = 50
+            ML_samples = 10
+            ML_pop_size_max = 1000
             ML_dimensions = 1
             
+            file_base = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max)
+            file_base = '1D_100_Gens_ML_t_50_samp_10_pop_1000'
             
-            filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_1.npy'
+            filename = file_base + '_settings_1.npy'
             pop_ML = np.load(filename).item()
             pop_size, A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance, angle_mutation = pop_ML['actions'][0,0],pop_ML['actions'][0,1],pop_ML['actions'][0,2],pop_ML['actions'][0,3],pop_ML['actions'][0,4],pop_ML['actions'][0,5],pop_ML['actions'][0,6],pop_ML['actions'][0,7],pop_ML['actions'][0,8],pop_ML['actions'][0,9],pop_ML['actions'][0,10]
     
-            filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_2.npy'
+            filename = file_base + '_settings_2.npy'
             ML_settings = np.load(filename).astype(int)
             dimensions, loc_des_x, loc_des_y, vel_des, t_steps, pop_size_max, samples, generations = ML_settings
             ML_settings_temp = np.load(filename) 
@@ -553,13 +563,15 @@ if __name__ == "__main__":
             pop_size = int(pop_size*pop_size_max)
             
             
-#            t_steps = 20
-            samples = 1
+            t_steps = 50
+            samples = 10
 #            loc_des_y = 0
-#            pop_size = 1000
-            dimensions = 2
-            generations = 10000
-        
+            
+            dimensions = 1
+            generations = 1000
+            A_f, A_l, A_t, A_v = [0.6405412397849952,0.10141323789118006,0.426522442525838,0.7690407264472648]
+            perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance = [0.18,0.12,0.1,0.82,0.13]
+            pop_size = 1500
         
         else:
             dimensions = 2
@@ -585,7 +597,16 @@ if __name__ == "__main__":
             generations = 10000
             samples = 1
         
-        median_generations = n_d_runfile(dimensions, loc_des_x, loc_des_y, vel_des, t_steps, pop_size, A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance, angle_mutation, samples, generations)
+        generation_stats = n_d_runfile(dimensions, loc_des_x, loc_des_y, vel_des, t_steps, pop_size, A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance, angle_mutation, samples, generations)
+    
+#        plt.figure(1000)
+#        plt.plot(pop_size,generation_stats[0],'.k')
+#        
+#        plt.figure(1002)
+#        plt.plot(pop_size,generation_stats[2],'.r')
+#        
+#        plt.figure(1001)
+#        plt.plot(pop_size,generation_stats[1],'.b')
     
     elif optimize_ML == 1:
         start_ML_ML_optimization(generations)
