@@ -323,7 +323,7 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
         gen_count[1,KK] = elapsed_time
 
     gen_count_stats = np.zeros((3))
-    gen_count_stats[:2] = np.median(gen_count,1)
+    gen_count_stats[:2] = np.mean(gen_count,1)
     gen_count_stats[2] = np.sqrt(np.var(gen_count[0,:]))
     
     return gen_count_stats, pop, best_performance, acc, dt
@@ -357,7 +357,7 @@ def calculate_ML(pop_ML, current_gen, ML_settings):
     
     start_time = time.time()
     gen_stats = np.zeros((np.size(pop_ML['actions'],0)))
-    pool = Pool(5)
+    pool = Pool(10)
     
     ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations = ML_settings
   
@@ -430,12 +430,12 @@ def generate_children_ML(pop_ML, actions, selection_num_ML, selected_pop, mutate
 
 def run_ML(generations, ML_settings, already_started = 0, pop_ML = None):
 
-    pop_size = 20
+    pop_size = 100
     t_steps = 11
     
     perc_elite = 0.10
-    perc_lucky = 0.0
-    perc_mutation = 0.50
+    perc_lucky = 0.05
+    perc_mutation = 0.20
 #    mutation_chance = 0.05
     
     pop_num_elite = int(perc_elite*pop_size)
@@ -451,7 +451,7 @@ def run_ML(generations, ML_settings, already_started = 0, pop_ML = None):
     mutation_gene_num = 1#int(mutation_chance*t_steps)
     selection_num_ML = np.array([pop_num_elite, pop_num_selected, pop_num_lucky, pop_num_mutation, mutation_gene_num])
     
-    time_to_locvel_ratio = 0.49
+    time_to_locvel_ratio = 0.99
     dist_to_vel_ration = 0.5
     
     if already_started == 0:
@@ -481,8 +481,8 @@ def run_ML(generations, ML_settings, already_started = 0, pop_ML = None):
 def start_ML_ML_optimization(generations):
            
     change_settings = 0
-    already_started = 0
-    load_old_file = 1
+    already_started = 1
+    load_old_file = 0
     
     ML_dimensions = 1
     ML_loc_des_x = 100
@@ -490,7 +490,7 @@ def start_ML_ML_optimization(generations):
     ML_vel_des = 0
     ML_t_steps = 50
     ML_pop_size_max = 2000
-    ML_samples = 10
+    ML_samples = 20
     ML_generations = 1000
     
     ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
@@ -513,12 +513,15 @@ def start_ML_ML_optimization(generations):
                 ML_generations = 5000
                 ML_t_steps = 100
         else:
-            file_base = '1D_100_Gens_time_ML_t_20_samp_100_pop_2000'
+            file_base = '1D_200_Gens_time_ML_t_50_samp_20_pop_2000'
             filename = file_base + '_settings_1.npy'
             pop_ML = np.load(filename).item()
             
         
         ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
+        
+        generations = 20
+        
         pop_ML, best_performance = run_ML(generations, ML_settings, already_started, pop_ML)
     
     filename = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max) + '_settings_1.npy'
@@ -534,7 +537,7 @@ if __name__ == "__main__":
     ### Design Values
     
     optimize_ML = 1
-    generations = 100
+    generations = 200
     already_started = 1
     ideal_time_perc = 0.8
     dt = 1.0
@@ -544,12 +547,12 @@ if __name__ == "__main__":
     
         if already_started == 1:
             ML_t_steps = 50
-            ML_samples = 10
-            ML_pop_size_max = 1000
+            ML_samples = 20
+            ML_pop_size_max = 2000
             ML_dimensions = 1
             
-            file_base = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max)
-            file_base = '1D_100_Gens_ML_t_50_samp_10_pop_1000'
+            file_base = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max)
+#            file_base = '1D_100_Gens_ML_t_50_samp_10_pop_1000'
             
             filename = file_base + '_settings_1.npy'
             pop_ML = np.load(filename).item()
@@ -563,15 +566,18 @@ if __name__ == "__main__":
             pop_size = int(pop_size*pop_size_max)
             
             
-            t_steps = 50
-            samples = 10
+#            t_steps = 50
+#            samples = 10
 #            loc_des_y = 0
             
-            dimensions = 1
-            generations = 1000
-            A_f, A_l, A_t, A_v = [0.6405412397849952,0.10141323789118006,0.426522442525838,0.7690407264472648]
-            perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance = [0.18,0.12,0.1,0.82,0.13]
-            pop_size = 1500
+#            dimensions = 1
+#            generations = 1000
+#            A_l = 0.025
+#            A_t = (A_v+A_t)
+#            A_f = 2
+#            A_f, A_l, A_t, A_v = [0.5,0.01,0.426522442525838,0.7690407264472648]
+#            perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance = [0.18,0.12,0.1,0.82,0.13]
+#            pop_size = 1500
         
         else:
             dimensions = 2
