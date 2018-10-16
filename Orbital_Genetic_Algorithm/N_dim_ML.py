@@ -151,14 +151,14 @@ def fitness(pop, weights, goals, thresh, v_max, dimensions):
     
     return pop
 
-def init_population(pop, dimensions):
-    
+def init_population(pop, dimensions, deg_steps):
+       
     if dimensions == 1:
         pop['actions'][:,:,0] = np.random.randint(-1, 2, size = np.shape(pop['actions'][:,:,0]))
     elif dimensions == 2:
         pop['actions'][:,:,0] = np.random.randint(0, 2, size = np.shape(pop['actions'][:,:,0]))
 #        pop['actions'][:,:,1] = np.random.uniform(0, 2*np.pi, size = np.shape(pop['actions'][:,:,1]))
-        pop['actions'][:,:,1] = np.random.randint(0, 360, size = np.shape(pop['actions'][:,:,1]))*(np.pi/180)
+        pop['actions'][:,:,1] = np.random.randint(0, 360/deg_steps, size = np.shape(pop['actions'][:,:,1]))*deg_steps*(np.pi/180)
 #    print(pop['actions'][:,:,1])
     return pop
 
@@ -185,7 +185,7 @@ def velocity_distance_2d(pop,dt,acc,t_steps):
     
     return np.sqrt(v_x[:,-1]**2 + v_y[:,-1]**2), d_x, d_y
 
-def pop_selection(pop, selection_num, dimensions, angle_mutation):
+def pop_selection(pop, selection_num, dimensions, angle_mutation, deg_steps):
     
     sorted_pop = np.argsort(pop['score'])[::-1]
     
@@ -198,12 +198,12 @@ def pop_selection(pop, selection_num, dimensions, angle_mutation):
     
     actions = pop['actions'][np.concatenate((elite_pop,lucky_pop))]
     
-    pop = generate_children(pop, actions, selection_num, selected_pop, mutated_pop, dimensions, angle_mutation)
+    pop = generate_children(pop, actions, selection_num, selected_pop, mutated_pop, dimensions, angle_mutation, deg_steps)
     
     return pop, [np.array(pop['score'][sorted_pop[0]]),pop['results'][sorted_pop[0]],sorted_pop[0]]
 
-def generate_children(pop, actions, selection_num, selected_pop, mutated_pop, dimensions, angle_mutation):
-
+def generate_children(pop, actions, selection_num, selected_pop, mutated_pop, dimensions, angle_mutation, deg_steps):
+    
     mutated_actions = pop['actions'][mutated_pop,:,:]
     mut_num = np.random.randint(1,selection_num[4]+1,size = 1)[0]
     indices = np.random.randint(0,np.size(mutated_actions[0,:,0]), size = (np.size(mutated_actions[:,0,0]),mut_num))
@@ -217,9 +217,10 @@ def generate_children(pop, actions, selection_num, selected_pop, mutated_pop, di
         indices = np.random.randint(0,np.size(mutated_actions[0,:,0]), size = (np.size(mutated_actions[:,0,0]),mut_num))
         for i, mut_locs in enumerate(indices):
 #            mutated_actions[i,mut_locs,1] = np.random.uniform(0, 2*np.pi, size = mut_num)
+            mutated_actions[i,mut_locs,1] = np.random.randint(0, 360/deg_steps, size = mut_num)*deg_steps*(np.pi/180)
 #            mutated_actions[i,mut_locs,1] = mutated_actions[i,mut_locs,1]*np.random.uniform(1-angle_mutation, 1+angle_mutation, size = mut_num)
-            mutated_actions[i,mut_locs,1] = np.random.randint(0, 360, size = mut_num)*(np.pi/180)
-    
+#            mutated_actions[i,mut_locs,1] = np.floor((mutated_actions[i,mut_locs,1]*np.random.uniform(1-angle_mutation, 1+angle_mutation, size = mut_num))*180/np.pi)*np.pi/180
+            
     random_selection_children_0 = np.random.randint(0,2,size = (int(len(selected_pop)/2),np.size(pop['actions'][0,:,0]),dimensions))
     if dimensions == 2:
         random_selection_children_0[:,:,1] = random_selection_children_0[:,:,0]
@@ -245,6 +246,8 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
     thresh_vel = 0.0
     thresh_time = 0.0
     thresh_perf = 1e-5
+    
+    deg_steps = 5
     
     thresh = np.array([thresh_loc, thresh_vel, thresh_time])
     A_f = 0.0
@@ -279,8 +282,8 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
             pop_num_elite -= 1
             
         mutation_gene_num = int(mutation_chance*t_steps)
-        if mutation_gene_num < 1:
-            mutation_gene_num = 1
+        if mutation_gene_num < 2:
+            mutation_gene_num = 2
         selection_num = np.array([pop_num_elite, pop_num_selected, pop_num_lucky, pop_num_mutation, mutation_gene_num])
         if dimensions == 1:
             v_max = (loc_des_x)/(dt*t_steps*ideal_time_perc/2)
@@ -292,13 +295,13 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
         
         COUNT = 0
         ## First iteration
-        pop = init_population(pop, dimensions)
+        pop = init_population(pop, dimensions, deg_steps)
         ## Calculate Generations until convergence or theory max               
         for I in range(generations):
             
             pop = calculate_result(pop, acc, t_steps, dt, [], False, dimensions)
             pop = fitness(pop, weights, goals, thresh, v_max, dimensions)
-            pop, best_performance = pop_selection(pop, selection_num, dimensions, angle_mutation)
+            pop, best_performance = pop_selection(pop, selection_num, dimensions, angle_mutation, deg_steps)
             
             if np.mod(I,100) == 0 and I != 0:
                 print('t: %d, Pop: %d, Run: %1d, Max Perf: %3.3f' % (t_steps,pop_size,KK, theory_max))
@@ -496,14 +499,14 @@ def start_ML_ML_optimization(generations):
     already_started = 1
     load_old_file = 0
     
-    ML_dimensions = 1
+    ML_dimensions = 2
     ML_loc_des_x = 100
     ML_loc_des_y = 100*np.tan(60*np.pi/180)
     ML_vel_des = 0
-    ML_t_steps = 50
-    ML_pop_size_max = 2000
-    ML_samples = 20
     ML_generations = 1000
+    ML_t_steps = 5
+    ML_samples = 5
+    ML_pop_size_max = 5000
     
     ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
     
@@ -522,12 +525,13 @@ def start_ML_ML_optimization(generations):
     #        filename = 'Population_ML_Gen_Temp.npy'
     #        pop_ML = np.load(filename).item()
             if change_settings == 1:
-                ML_generations = 10000
-                ML_t_steps = 5
-                ML_samples = 2
-                ML_dimensions = 2
-                ML_loc_des_y = 100*np.tan(60*np.pi/180)
-                generations = 20
+                ML_generations = 2000
+                ML_t_steps = 10
+#                ML_samples = 5
+#                ML_dimensions = 2
+#                ML_loc_des_y = 100*np.tan(60*np.pi/180)
+                generations = 10
+#                ML_pop_size_max = 5000
         else:
             file_base = '1D_200_Gens_time_ML_t_50_samp_20_pop_2000'
             filename = file_base + '_settings_1.npy'
@@ -551,19 +555,16 @@ if __name__ == "__main__":
     ### Design Values
     
     optimize_ML = 1
-    generations = 200
-    already_started = 1
-    ideal_time_perc = 0.8
-    dt = 1.0
-    
+    generations = 20
+    already_started = 1    
     
     if optimize_ML == 0:
     
         if already_started == 1:
-            ML_t_steps = 50
-            ML_samples = 20
-            ML_pop_size_max = 2000
-            ML_dimensions = 1
+            ML_t_steps = 5
+            ML_samples = 5
+            ML_pop_size_max = 5000
+            ML_dimensions = 2
             
             file_base = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max)
 #            file_base = '1D_100_Gens_ML_t_50_samp_10_pop_1000'
@@ -580,20 +581,21 @@ if __name__ == "__main__":
             pop_size = int(pop_size*pop_size_max)
             
             
-            t_steps = 5
-            samples = 1
-            loc_des_y = 100*np.tan(60*np.pi/180)
-            
-            dimensions = 2
-            generations = 1000
-            A_l = 0.5
-            A_v = 0.25
-            A_t = (A_v+A_t)*0.49
+            t_steps = 10
+#            samples = 1
+#            loc_des_y = 100*np.tan(60*np.pi/180)
+#            angle_mutation = 0.05
+#            dimensions = 2
+#            generations = 10000
+#            pop_size = 2000
+#            A_l = 0.5
+#            A_v = 0.5
+#            A_t = (A_v+A_t)*0.99
             
 #            A_f = 2
 #            A_f, A_l, A_t, A_v = [0.5,0.01,0.426522442525838,0.7690407264472648]
 #            perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance = [0.18,0.12,0.1,0.82,0.13]
-#            pop_size = 1500
+            
         
         else:
             dimensions = 2
