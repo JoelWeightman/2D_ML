@@ -143,7 +143,7 @@ def fitness(pop, weights, goals, thresh, v_max_x, v_max_y, dimensions):
     nonzero_length = np.argmin(fuel_sum, axis = 1)
     time_taken = np.zeros(np.shape(pop['results'])[0])
     for i in range(np.shape(pop['results'])[0]):
-        time_taken[i] = np.sum(pop['actions'][i,:nonzero_length[i],1])
+        time_taken[i] = np.sum(pop['actions'][i,:nonzero_length[i],-1])
     
     temp_fuel_score = (weights[2] - weights[2] * (time_taken) / (np.size(pop['actions'],1)))# + (weights[3] - weights[3] * fuel_sum[:,0] / np.size(pop['actions'],1))
     temp_fuel_score[temp_fuel_score > (1-goals[-1])*weights[2]] = (1-goals[-1])*weights[2]
@@ -152,7 +152,7 @@ def fitness(pop, weights, goals, thresh, v_max_x, v_max_y, dimensions):
     pop['score'] *= 1/np.sum(weights)
     
     
-    pop['score'][pop['score'] < 0] = 0
+#    pop['score'][pop['score'] < 0] = 0
     
     return pop
 
@@ -311,7 +311,7 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
             v_max_x = np.abs(loc_des_x)/(dt*t_steps*ideal_time_perc/2)
             v_max_y = np.abs(loc_des_y)/(dt*t_steps*ideal_time_perc/2)
             
-        acc = np.array([v_max_x/(dt*t_steps*ideal_time_perc/2),v_max_y/(dt*t_steps*ideal_time_perc/2)])
+        acc = np.array([v_max_x/(dt*t_steps*ideal_time_perc/2),v_max_x/(dt*t_steps*ideal_time_perc/2)]) ### Changed to one acc value
         theory_max = (A_l + A_v + A_t*(1-ideal_time_perc))/(A_l + A_v + A_t)
         
         COUNT = 0
@@ -532,7 +532,7 @@ def start_ML_ML_optimization(generations):
     ML_generations = 100
     ML_t_steps = 10
     ML_samples = 5
-    ML_pop_size_max = 5000
+    ML_pop_size_max = 1000
     
     ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des_x, ML_vel_des_y, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
     
@@ -551,7 +551,7 @@ def start_ML_ML_optimization(generations):
     #        filename = 'Population_ML_Gen_Temp.npy'
     #        pop_ML = np.load(filename).item()
             if change_settings == 1:
-                ML_generations = 1000
+                ML_generations = 5000
                 ML_t_steps = 10
 #                ML_samples = 5
 #                ML_dimensions = 2
@@ -582,20 +582,20 @@ if __name__ == "__main__":
     
     optimize_ML = 1
     generations = 10
-    already_started = 0
+    already_started = 1
     
     if optimize_ML == 0:
     
         if already_started == 1:
-            ML_dimensions = 1
+            ML_dimensions = 2
             ML_loc_des_x = 100
             ML_loc_des_y = 100*np.tan(60*np.pi/180)
             ML_vel_des_x = 0
             ML_vel_des_y = 0
-            ML_generations = 1000
+            ML_generations = 100
             ML_t_steps = 10
             ML_samples = 5
-            ML_pop_size_max = 5000
+            ML_pop_size_max = 1000
             
             file_base = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max)
 #            file_base = '1D_100_Gens_ML_t_50_samp_10_pop_1000'
@@ -614,17 +614,20 @@ if __name__ == "__main__":
             
 #            t_steps = 10
             samples = 1
-            loc_des_y = 100
-#            angle_mutation = 0.05
-            dimensions = 2
+##            loc_des_y = 100
+##            angle_mutation = 0.05
+##            dimensions = 2
             generations = 1000
-#            pop_size = 5000
-#            vel_des_x = 0  
-#            vel_des_y = 0
-##            A_l = 0.5
-            A_v = 0.5
-            A_t = 0.05
-            
+            pop_size = 5000
+##            vel_des_x = 0  
+##            vel_des_y = 0
+            A_l = 0.5
+#            A_v = 0.75
+#            A_t = 0.1
+#            
+#            perc_mutation = 0.75
+#            mutation_chance = 0.75
+#            
 #            A_f = 2
 #            A_f, A_l, A_t, A_v = [0.5,0.01,0.426522442525838,0.7690407264472648]
 #            perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance = [0.18,0.12,0.1,0.82,0.13]
