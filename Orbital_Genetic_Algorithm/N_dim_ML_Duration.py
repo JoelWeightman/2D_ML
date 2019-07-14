@@ -22,43 +22,46 @@ def calculate_result(pop, acc, t_steps, dt, best_index, final, dimensions):
                     
             v, d = velocity_distance_1d(pop,dt,acc,t_steps)
                 
-            pop['results'] = np.concatenate((d,v), axis = 1)
+            pop['results'] = np.concatenate((d[:,np.newaxis],v[:,np.newaxis]), axis = 1)
         
             return pop
                 
         else:
             
-            v1 = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1],1))
-            
-            v1[:,1:t_steps,0] = np.cumsum(pop['actions'][:,:-1]*dt*acc, axis = 1)[:,:,0]
-            d1 = np.cumsum(v1*dt, axis = 1)
+            v1 = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1]))
+            temp_time = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1]))
+            temp_time[:,1:t_steps] = pop['actions'][:,:-1,1]
+            v1[:,1:t_steps] = np.cumsum(pop['actions'][:,:-1,0]*pop['actions'][:,:-1,1]*acc[0], axis = 1)[:,:]
+            d1 = integ.cumtrapz(v1[:,:], x = np.cumsum(temp_time, axis = 1), axis = 1, initial = 0)
                 
-#            plt.figure()
-#            plt.scatter(np.arange(np.size(pop['actions'][0,:])),d1[best_index,:,0], s = 1, c='red')
-#            plt.figure()
-#            plt.scatter(np.arange(np.size(pop['actions'][0,:])),v1[best_index,:,0], s = 1,c='black')
+            plt.figure()
+            plt.scatter(np.cumsum(temp_time[best_index,:]),d1[best_index,:], s = 1, c='red')
+            plt.figure()
+            plt.scatter(np.cumsum(temp_time[best_index,:]),v1[best_index,:], s = 1,c='black')
             
             return
         
     elif dimensions == 2:
         if final == False:
                         
-            v, d_x, d_y = velocity_distance_2d(pop,dt,acc,t_steps)
+            v_x, v_y, d_x, d_y = velocity_distance_2d(pop,dt,acc,t_steps)
                 
-            pop['results'] = np.concatenate((d_x, d_y, v), axis = 1)
+            pop['results'] = np.concatenate((d_x[:,np.newaxis], d_y[:,np.newaxis], v_x[:,np.newaxis], v_y[:,np.newaxis]), axis = 1)
         
             return pop
                 
         else:
             
-            v_x = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1],1))
-            v_y = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1],1))
+            v_x = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1]))
+            v_y = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1]))
+            temp_time = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1]))
+            temp_time[:,1:t_steps] = pop['actions'][:,:-1,2]
             
-            v_x[:,1:t_steps,0] = np.cumsum(np.multiply(pop['actions'][:,:-1,0],acc*dt*np.cos(pop['actions'][:,:-1,1])), axis = 1)
-            v_y[:,1:t_steps,0] = np.cumsum(np.multiply(pop['actions'][:,:-1,0],acc*dt*np.sin(pop['actions'][:,:-1,1])), axis = 1)
+            v_x[:,1:t_steps] = np.cumsum(np.multiply(pop['actions'][:,:-1,0],acc[0]*pop['actions'][:,:-1,2]*np.cos(pop['actions'][:,:-1,1])), axis = 1)[:,:]
+            v_y[:,1:t_steps] = np.cumsum(np.multiply(pop['actions'][:,:-1,0],acc[1]*pop['actions'][:,:-1,2]*np.sin(pop['actions'][:,:-1,1])), axis = 1)[:,:]
             
-            d_x = integ.cumtrapz(v_x, dx = dt, axis = 1, initial = 0)
-            d_y = integ.cumtrapz(v_y, dx = dt, axis = 1, initial = 0)
+            d_x = integ.cumtrapz(v_x, x = np.cumsum(temp_time, axis = 1), axis = 1, initial = 0)
+            d_y = integ.cumtrapz(v_y, x = np.cumsum(temp_time, axis = 1), axis = 1, initial = 0)
                 
             
 #            plt.figure(1)
@@ -94,15 +97,15 @@ def calculate_result(pop, acc, t_steps, dt, best_index, final, dimensions):
             plt.figure(1)
             plt.clf()
             plt.subplot(3,1,1)
-            plt.scatter(np.arange(np.size(pop['actions'][0,:,0])),np.sqrt(v_x[best_index,:,0]**2 + v_y[best_index,:,0]**2), s = 1,c='black')
+            plt.scatter(np.cumsum(temp_time[best_index,:]),np.sqrt(v_x[best_index,:]**2 + v_y[best_index,:]**2), s = 1,c='black')
             plt.xlabel('Time')
             plt.ylabel('Velocity')
             plt.subplot(3,1,2)
-            plt.scatter(d_x[best_index,:,0],d_y[best_index,:,0], s = 1,c='black')
+            plt.scatter(d_x[best_index,:],d_y[best_index,:], s = 1,c='black')
             plt.xlabel('Distance_X')
             plt.ylabel('Distance_Y')
             plt.subplot(3,1,3)
-            plt.scatter(np.arange(np.size(pop['actions'][0,:,0])),pop['actions'][best_index,:,1]*180/np.pi, s = 1,c='black')
+            plt.scatter(np.cumsum(temp_time[best_index,:]),pop['actions'][best_index,:,1]*180/np.pi, s = 1,c='black')
             plt.xlabel('Time')
             plt.ylabel('Angle')
             plt.pause(0.001)
@@ -111,43 +114,45 @@ def calculate_result(pop, acc, t_steps, dt, best_index, final, dimensions):
         return
 
 
-def fitness(pop, weights, goals, thresh, v_max, dimensions):
+def fitness(pop, weights, goals, thresh, v_max_x, v_max_y, dimensions):
 
     pop['actions'][:,-1,:] = 0.0
     loc_val = np.zeros((np.shape(pop['results'])[0]))
     goal_loc_val = np.zeros((np.shape(pop['results'])[0]))
-    for dim in range(dimensions):
+    
+    if dimensions == 1:
+        loc_val += (pop['results'][:,0] - goals[0])**2
+        goal_loc_val += goals[0]**2
+        loc_val = np.sqrt(loc_val) / np.sqrt(goal_loc_val)
         
-        loc_val += (pop['results'][:,dim] - goals[dim])**2
-#        print(loc_val[0])
-        goal_loc_val += goals[dim]**2
-#        print(goals[dim])
+        vel_val = np.abs(pop['results'][:,1] - goals[1]) / (v_max_x*thresh[1])
         
+    elif dimensions == 2:
         
-    loc_val = np.sqrt(loc_val) / np.sqrt(goal_loc_val)
-    vel_val = np.abs(pop['results'][:,dimensions] - goals[dimensions]) / (v_max)
-       
+        loc_val += (pop['results'][:,0] - goals[0])**2 + (pop['results'][:,1] - goals[1])**2
+        goal_loc_val += np.sum(goals[0:2]**2)
+        loc_val = np.sqrt(loc_val) / np.sqrt(goal_loc_val)
+        
+        vel_val = np.abs(np.sqrt((pop['results'][:,2] - goals[2])**2) / v_max_x + np.sqrt((pop['results'][:,3] - goals[3])**2) / v_max_y)
+
+
     goal_val = np.concatenate((loc_val[:,np.newaxis],vel_val[:,np.newaxis]), axis = 1)
     pop['score'] = (weights[0] - weights[0]*goal_val[:,0]) + (weights[1] - weights[1]*goal_val[:,1])
     
     fuel_sum = np.cumsum(np.abs(pop['actions'][:,::-1,0]), axis = 1)[:,::-1]
     nonzero_length = np.argmin(fuel_sum, axis = 1)
+    time_taken = np.zeros(np.shape(pop['results'])[0])
+    for i in range(np.shape(pop['results'])[0]):
+        time_taken[i] = np.sum(pop['actions'][i,:nonzero_length[i],-1])
     
-    temp_fuel_score = (weights[2] - weights[2] * (nonzero_length) / (np.size(pop['actions'],1)))# + (weights[3] - weights[3] * fuel_sum[:,0] / np.size(pop['actions'],1))
-    temp_fuel_score[temp_fuel_score > 0.2*weights[2]] = 0.2*weights[2]
+    temp_fuel_score = (weights[2] - weights[2] * (time_taken) / (np.size(pop['actions'],1)))# + (weights[3] - weights[3] * fuel_sum[:,0] / np.size(pop['actions'],1))
+    temp_fuel_score[temp_fuel_score > (1-goals[-1])*weights[2]] = (1-goals[-1])*weights[2]
     pop['score'] += temp_fuel_score
 
-#    print(nonzero_length.min())
-##    print((np.size(pop['actions'],1)))
-##    print(loc_val.min(), vel_val.min())
-#    print((weights[0] - weights[0]*goal_val[0,0]), (weights[1] - weights[1]*goal_val[0,1]), (weights[2] - weights[2] * (nonzero_length[0]) / (np.size(pop['actions'],1))))
-#    print((goal_val[0,0]), (goal_val[0,1]), (nonzero_length[0]) / (np.size(pop['actions'],1)))
-#    print(weights[0], weights[1], weights[2]*0.2)
-##    print((weights[0] - weights[0]*goal_val[:,0]).argmax(), (weights[1] - weights[1]*goal_val[:,1]).argmax(), (weights[2] - weights[2] * (nonzero_length) / (np.size(pop['actions'],1))).argmax())
-##    print((weights[2] - weights[2] * (nonzero_length) / (np.size(pop['actions'],1))).max(), (weights[3] - weights[3] * fuel_sum[:,0] / np.size(pop['actions'],1)).max())
-#    print(np.sum(weights))
     pop['score'] *= 1/np.sum(weights)
-#    print(pop['score'].max())
+    
+    
+#    pop['score'][pop['score'] < 0] = 0
     
     return pop
 
@@ -155,35 +160,41 @@ def init_population(pop, dimensions, deg_steps):
        
     if dimensions == 1:
         pop['actions'][:,:,0] = np.random.randint(-1, 2, size = np.shape(pop['actions'][:,:,0]))
+#        pop['actions'][:,:,1] = np.random.uniform(0, np.shape(pop['actions'][:,:,0])[1], size = np.shape(pop['actions'][:,:,0]))
+        pop['actions'][:,:,1] = np.round(np.random.uniform(0, 5, size = np.shape(pop['actions'][:,:,0]))*10)/10
     elif dimensions == 2:
         pop['actions'][:,:,0] = np.random.randint(0, 2, size = np.shape(pop['actions'][:,:,0]))
-#        pop['actions'][:,:,1] = np.random.uniform(0, 2*np.pi, size = np.shape(pop['actions'][:,:,1]))
         pop['actions'][:,:,1] = np.random.randint(0, 360/deg_steps, size = np.shape(pop['actions'][:,:,1]))*deg_steps*(np.pi/180)
-#    print(pop['actions'][:,:,1])
+        pop['actions'][:,:,2] = np.round(np.random.uniform(0, 5, size = np.shape(pop['actions'][:,:,0]))*10)/10
+
     return pop
 
 def velocity_distance_1d(pop,dt,acc,t_steps):
     
-    v = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1],1))
-
-    v[:,1:t_steps,0] = np.cumsum(np.multiply(pop['actions'][:,:-1],acc*dt), axis = 1)[:,:,0]
-    d = np.trapz(v, dx = dt, axis = 1)
+    v = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1]))
+    temp_time = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1]))
+    
+    temp_time[:,1:t_steps] = pop['actions'][:,:-1,1]
+    v[:,1:t_steps] = np.cumsum((pop['actions'][:,:-1,0]*acc[0]*pop['actions'][:,:-1,1]), axis = 1)[:,:]
+    d = np.trapz(v[:,:], x =  np.cumsum(temp_time, axis = 1), axis = 1)
     
     return v[:,-1], d
     
 
 def velocity_distance_2d(pop,dt,acc,t_steps):
     
-    v_x = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1],1))
-    v_y = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1],1))
-
-    v_x[:,1:t_steps,0] = np.cumsum(np.multiply(pop['actions'][:,:-1,0],acc*dt*np.cos(pop['actions'][:,:-1,1])), axis = 1)
-    v_y[:,1:t_steps,0] = np.cumsum(np.multiply(pop['actions'][:,:-1,0],acc*dt*np.sin(pop['actions'][:,:-1,1])), axis = 1)
-
-    d_x = np.trapz(v_x, dx = dt, axis = 1)
-    d_y = np.trapz(v_y, dx = dt, axis = 1)
+    v_x = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1]))
+    v_y = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1]))
+    temp_time = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1]))
     
-    return np.sqrt(v_x[:,-1]**2 + v_y[:,-1]**2), d_x, d_y
+    temp_time[:,1:t_steps] = pop['actions'][:,:-1,2]
+    v_x[:,1:t_steps] = np.cumsum(np.multiply(pop['actions'][:,:-1,0],acc[0]*pop['actions'][:,:-1,2]*np.cos(pop['actions'][:,:-1,1])), axis = 1)[:,:]
+    v_y[:,1:t_steps] = np.cumsum(np.multiply(pop['actions'][:,:-1,0],acc[1]*pop['actions'][:,:-1,2]*np.sin(pop['actions'][:,:-1,1])), axis = 1)[:,:]
+
+    d_x = np.trapz(v_x, x = np.cumsum(temp_time, axis = 1), axis = 1)
+    d_y = np.trapz(v_y, x = np.cumsum(temp_time, axis = 1), axis = 1)
+    
+    return v_x[:,-1], v_y[:,-1], d_x, d_y
 
 def pop_selection(pop, selection_num, dimensions, angle_mutation, deg_steps):
     
@@ -210,8 +221,12 @@ def generate_children(pop, actions, selection_num, selected_pop, mutated_pop, di
     for i, mut_locs in enumerate(indices):
         if dimensions == 1:
             mutated_actions[i,mut_locs,0] = np.random.randint(-1, 2, size = mut_num)
+#            mutated_actions[i,mut_locs,1] = np.random.uniform(0, np.shape(pop['actions'])[1], size = mut_num)
+            mutated_actions[i,mut_locs,1] = np.round(np.random.uniform(0, 5, size = mut_num)*10)/10
         elif dimensions == 2:
             mutated_actions[i,mut_locs,0] = np.random.randint(0, 2, size = mut_num)
+#            mutated_actions[i,mut_locs,2] = np.random.uniform(0, np.shape(pop['actions'])[1], size = mut_num)
+            mutated_actions[i,mut_locs,2] = np.round(np.random.uniform(0, 5, size = mut_num)*10)/10
     if dimensions == 2:
         mut_num = np.random.randint(1,selection_num[4]+1,size = 1)[0]
         indices = np.random.randint(0,np.size(mutated_actions[0,:,0]), size = (np.size(mutated_actions[:,0,0]),mut_num))
@@ -221,9 +236,10 @@ def generate_children(pop, actions, selection_num, selected_pop, mutated_pop, di
 #            mutated_actions[i,mut_locs,1] = mutated_actions[i,mut_locs,1]*np.random.uniform(1-angle_mutation, 1+angle_mutation, size = mut_num)
 #            mutated_actions[i,mut_locs,1] = np.floor((mutated_actions[i,mut_locs,1]*np.random.uniform(1-angle_mutation, 1+angle_mutation, size = mut_num))*180/np.pi)*np.pi/180
             
-    random_selection_children_0 = np.random.randint(0,2,size = (int(len(selected_pop)/2),np.size(pop['actions'][0,:,0]),dimensions))
+    random_selection_children_0 = np.random.randint(0,2,size = (int(len(selected_pop)/2),np.size(pop['actions'][0,:,0]),dimensions+1))
+    random_selection_children_0[:,:,1] = random_selection_children_0[:,:,0]
     if dimensions == 2:
-        random_selection_children_0[:,:,1] = random_selection_children_0[:,:,0]
+        random_selection_children_0[:,:,2] = random_selection_children_0[:,:,0]
     random_selection_children_1 = 1 - random_selection_children_0
 #    print(np.shape(random_selection_children_0))
     
@@ -237,13 +253,13 @@ def generate_children(pop, actions, selection_num, selected_pop, mutated_pop, di
 
     return pop
 
-def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chance, pop_size, generations, t_steps, loc_des_x, loc_des_y, vel_des, ideal_time_perc, dt, dimensions, samples, angle_mutation):
+def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chance, pop_size, generations, t_steps, loc_des_x, loc_des_y, vel_des_x, vel_des_y, ideal_time_perc, dt, dimensions, samples, angle_mutation):
     
 #    plt.close("all")
     
     # Threshold Values
     thresh_loc = 0.0
-    thresh_vel = 0.0
+    thresh_vel = 1e-1
     thresh_time = 0.0
     thresh_perf = 1e-5
     
@@ -253,17 +269,20 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
     A_f = 0.0
     weights = np.array([A_l, A_v, A_t, A_f])
     if dimensions == 1:
-        goals = np.array([loc_des_x, vel_des, ideal_time_perc])
+        goals = np.array([loc_des_x, vel_des_x, ideal_time_perc])
     elif dimensions == 2:
-        goals = np.array([loc_des_x, loc_des_y, vel_des, ideal_time_perc])
+        goals = np.array([loc_des_x, loc_des_y, vel_des_x, vel_des_y, ideal_time_perc])
     
     ## Conditions to set
-    gen_count = np.zeros((2,samples))
+    gen_count = np.zeros((3,samples))
     
     for KK in range(samples):
         start_time = time.time()
         
-        pop = dict({'actions': np.zeros((pop_size,t_steps,dimensions)), 'results':np.zeros((pop_size,dimensions + 1)), 'score':np.zeros((pop_size))})
+        if dimensions == 1:
+            pop = dict({'actions': np.zeros((pop_size,t_steps,dimensions+1)), 'results':np.zeros((pop_size,dimensions + 1)), 'score':np.zeros((pop_size))})
+        elif dimensions == 2:
+            pop = dict({'actions': np.zeros((pop_size,t_steps,dimensions+1)), 'results':np.zeros((pop_size,dimensions + 2)), 'score':np.zeros((pop_size))})
         
         ## Calculated Parameters
         pop_num_elite = int(perc_elite*pop_size)
@@ -286,11 +305,13 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
             mutation_gene_num = 2
         selection_num = np.array([pop_num_elite, pop_num_selected, pop_num_lucky, pop_num_mutation, mutation_gene_num])
         if dimensions == 1:
-            v_max = (loc_des_x)/(dt*t_steps*ideal_time_perc/2)
+            v_max_x = (loc_des_x)/(dt*t_steps*ideal_time_perc/2)
+            v_max_y = 0
         elif dimensions == 2:
-            v_max = np.sqrt(loc_des_x**2 + loc_des_y**2)/(dt*t_steps*ideal_time_perc/2)
+            v_max_x = np.abs(loc_des_x)/(dt*t_steps*ideal_time_perc/2)
+            v_max_y = np.abs(loc_des_y)/(dt*t_steps*ideal_time_perc/2)
             
-        acc = v_max/(dt*t_steps*ideal_time_perc/2)
+        acc = np.array([v_max_x/(dt*t_steps*ideal_time_perc/2),v_max_x/(dt*t_steps*ideal_time_perc/2)]) ### Changed to one acc value
         theory_max = (A_l + A_v + A_t*(1-ideal_time_perc))/(A_l + A_v + A_t)
         
         COUNT = 0
@@ -300,7 +321,7 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
         for I in range(generations):
             
             pop = calculate_result(pop, acc, t_steps, dt, [], False, dimensions)
-            pop = fitness(pop, weights, goals, thresh, v_max, dimensions)
+            pop = fitness(pop, weights, goals, thresh, v_max_x, v_max_y, dimensions)
             pop, best_performance = pop_selection(pop, selection_num, dimensions, angle_mutation, deg_steps)
             
             if np.mod(I,100) == 0 and I != 0:
@@ -332,33 +353,34 @@ def run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chan
         
 #        print(A_l, A_v, A_t)
         elapsed_time = time.time() - start_time
-        gen_count[0,KK] = I
+        gen_count[0,KK] = (I+1)/generations
         gen_count[1,KK] = elapsed_time
+        gen_count[2,KK] = np.abs(theory_max - np.median(pop['score'][pop['score'] > 0]))/theory_max
 
-    gen_count_stats = np.zeros((3))
-    gen_count_stats[:2] = np.mean(gen_count,1)
-    gen_count_stats[2] = np.sqrt(np.var(gen_count[0,:]))
+    gen_count_stats = np.zeros((4))
+    gen_count_stats[:3] = np.mean(gen_count,1)
+    gen_count_stats[3] = np.sqrt(np.var(gen_count[0,:]))
     
     return gen_count_stats, pop, best_performance, acc, dt
 
-def n_d_runfile(dimensions = 1, loc_des_x = 1, loc_des_y = 1, vel_des = 1, t_steps = 1, pop_size = 1, A_l = 1, A_v = 1, A_f = 1, A_t = 1, perc_elite = 1, perc_lucky = 1, perc_mutation = 1, perc_selected = 1, mutation_chance = 1, angle_mutation = 1, samples = 1, generations = 1):
+def n_d_runfile(dimensions = 1, loc_des_x = 1, loc_des_y = 1, vel_des_x = 0, vel_des_y = 0, t_steps = 1, pop_size = 1, A_l = 1, A_v = 1, A_f = 1, A_t = 1, perc_elite = 1, perc_lucky = 1, perc_mutation = 1, perc_selected = 1, mutation_chance = 1, angle_mutation = 1, samples = 1, generations = 1):
 
     dt = 1.0
     ideal_time_perc = 0.8
     perc_elite, perc_lucky, perc_mutation, perc_selected = np.array([perc_elite, perc_lucky, perc_mutation, perc_selected])/(perc_elite + perc_lucky + perc_mutation + perc_selected)
 
-    gen_count_stats, pop, best_performance, acc, dt = run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chance, pop_size, generations, t_steps, loc_des_x, loc_des_y, vel_des, ideal_time_perc, dt, dimensions, samples, angle_mutation)
+    gen_count_stats, pop, best_performance, acc, dt = run(A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, mutation_chance, pop_size, generations, t_steps, loc_des_x, loc_des_y, vel_des_x, vel_des_y, ideal_time_perc, dt, dimensions, samples, angle_mutation)
     
     calculate_result(pop, acc, t_steps, dt, best_performance[2], True, dimensions)
     print(gen_count_stats)
     print(pop['actions'][0,:,0])
     print(pop['actions'][0,:,1]*180/(np.pi))
-    return gen_count_stats
+    return gen_count_stats, pop
 
 
 def fitness_ML(pop_ML):
     
-    pop_ML['score'] = np.exp(-(pop_ML['results']/100))
+    pop_ML['score'] = np.exp(-(pop_ML['results'])/0.1)
     
     return pop_ML
 
@@ -372,14 +394,14 @@ def calculate_ML(pop_ML, current_gen, ML_settings):
     
     start_time = time.time()
     gen_stats = np.zeros((np.size(pop_ML['actions'],0)))
-    pool = Pool(10)
+    pool = Pool(6)
     
-    ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations = ML_settings
+    ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des_x, ML_vel_des_y, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations = ML_settings
   
     A = []
        
     for i in range(np.size(pop_ML['actions'],0)):
-        A.append((ML_dimensions,ML_loc_des_x,ML_loc_des_y,ML_vel_des,ML_t_steps,int(pop_ML['actions'][i,0]*ML_pop_size_max),pop_ML['actions'][i,1],pop_ML['actions'][i,2],pop_ML['actions'][i,3],pop_ML['actions'][i,4],pop_ML['actions'][i,5],pop_ML['actions'][i,6],pop_ML['actions'][i,7],pop_ML['actions'][i,8],pop_ML['actions'][i,9],pop_ML['actions'][i,10],ML_samples,ML_generations))
+        A.append((ML_dimensions,ML_loc_des_x,ML_loc_des_y,ML_vel_des_x,ML_vel_des_y,ML_t_steps,int(pop_ML['actions'][i,0]*ML_pop_size_max),pop_ML['actions'][i,1],pop_ML['actions'][i,2],pop_ML['actions'][i,3],pop_ML['actions'][i,4],pop_ML['actions'][i,5],pop_ML['actions'][i,6],pop_ML['actions'][i,7],pop_ML['actions'][i,8],pop_ML['actions'][i,9],pop_ML['actions'][i,10],ML_samples,ML_generations))
 #    print(A)
     print('Gen = %d' %(current_gen))
     gen_stats = np.zeros((np.shape(A)[0]))
@@ -388,8 +410,11 @@ def calculate_ML(pop_ML, current_gen, ML_settings):
 #        gen_stats[i] = n_d_runfile(dimensions, loc_des_x, loc_des_y, vel_des, t_steps, pop_size, A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance, angle_mutation, samples, generations)
 #    print(resultant_gen)
     for i, result in enumerate(pool.starmap(n_d_runfile, A)):
-        print(current_gen, i, result)
-        gen_stats[i] = result[0]
+        print(current_gen, i, result[0][0])
+#        if result[0][0] < 1:
+        gen_stats[i] = result[0][0]
+#        else:
+#            gen_stats[i] = result[0][2]
         
     elapsed_time = time.time() - start_time
     print(elapsed_time)
@@ -502,13 +527,14 @@ def start_ML_ML_optimization(generations):
     ML_dimensions = 2
     ML_loc_des_x = 100
     ML_loc_des_y = 100*np.tan(60*np.pi/180)
-    ML_vel_des = 0
-    ML_generations = 1000
-    ML_t_steps = 5
+    ML_vel_des_x = 0
+    ML_vel_des_y = 0
+    ML_generations = 100
+    ML_t_steps = 10
     ML_samples = 5
-    ML_pop_size_max = 5000
+    ML_pop_size_max = 1000
     
-    ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
+    ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des_x, ML_vel_des_y, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
     
     if already_started == 0:
         pop_ML, best_performance = run_ML(generations, ML_settings, already_started, [])
@@ -519,26 +545,26 @@ def start_ML_ML_optimization(generations):
             pop_ML = np.load(filename).item()
             filename = file_base + '_settings_2.npy'
             ML_settings = np.load(filename).astype(int)
-            ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations = ML_settings
+            ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des_x, ML_vel_des_y, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations = ML_settings
             ML_settings_temp = np.load(filename) 
             ML_loc_des_x, ML_loc_des_y, ML_vel_des = ML_settings_temp[1:4]
     #        filename = 'Population_ML_Gen_Temp.npy'
     #        pop_ML = np.load(filename).item()
             if change_settings == 1:
-                ML_generations = 2000
+                ML_generations = 5000
                 ML_t_steps = 10
 #                ML_samples = 5
 #                ML_dimensions = 2
 #                ML_loc_des_y = 100*np.tan(60*np.pi/180)
-                generations = 10
+                generations = 20
 #                ML_pop_size_max = 5000
-        else:
-            file_base = '1D_200_Gens_time_ML_t_50_samp_20_pop_2000'
-            filename = file_base + '_settings_1.npy'
-            pop_ML = np.load(filename).item()
+#        else:
+#            file_base = '1D_200_Gens_time_ML_t_50_samp_20_pop_2000'
+#            filename = file_base + '_settings_1.npy'
+#            pop_ML = np.load(filename).item()
             
         
-        ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
+        ML_settings = [ML_dimensions, ML_loc_des_x, ML_loc_des_y, ML_vel_des_x, ML_vel_des_y, ML_t_steps, ML_pop_size_max, ML_samples, ML_generations]
         
         pop_ML, best_performance = run_ML(generations, ML_settings, already_started, pop_ML)
     
@@ -554,17 +580,22 @@ if __name__ == "__main__":
     plt.close('all')
     ### Design Values
     
-    optimize_ML = 0
-    generations = 20
-    already_started = 1    
+    optimize_ML = 1
+    generations = 10
+    already_started = 1
     
     if optimize_ML == 0:
     
         if already_started == 1:
-            ML_t_steps = 5
-            ML_samples = 5
-            ML_pop_size_max = 5000
             ML_dimensions = 2
+            ML_loc_des_x = 100
+            ML_loc_des_y = 100*np.tan(60*np.pi/180)
+            ML_vel_des_x = 0
+            ML_vel_des_y = 0
+            ML_generations = 100
+            ML_t_steps = 10
+            ML_samples = 5
+            ML_pop_size_max = 1000
             
             file_base = str(ML_dimensions) + 'D_' + str(generations) + '_Gens_time_ML_t_' + str(ML_t_steps) + '_samp_' + str(ML_samples) + '_pop_' + str(ML_pop_size_max)
 #            file_base = '1D_100_Gens_ML_t_50_samp_10_pop_1000'
@@ -575,40 +606,47 @@ if __name__ == "__main__":
     
             filename = file_base + '_settings_2.npy'
             ML_settings = np.load(filename).astype(int)
-            dimensions, loc_des_x, loc_des_y, vel_des, t_steps, pop_size_max, samples, generations = ML_settings
+            dimensions, loc_des_x, loc_des_y, vel_des_x, vel_des_y, t_steps, pop_size_max, samples, generations = ML_settings
             ML_settings_temp = np.load(filename) 
             loc_des_x, loc_des_y, vel_des = ML_settings_temp[1:4]
             pop_size = int(pop_size*pop_size_max)
             
             
-            t_steps = 10
-#            samples = 1
-#            loc_des_y = 100*np.tan(60*np.pi/180)
-#            angle_mutation = 0.05
-#            dimensions = 2
-#            generations = 10000
-#            pop_size = 2000
-#            A_l = 0.5
-#            A_v = 0.5
-#            A_t = (A_v+A_t)*0.99
-            
+#            t_steps = 10
+            samples = 1
+##            loc_des_y = 100
+##            angle_mutation = 0.05
+##            dimensions = 2
+            generations = 1000
+            pop_size = 5000
+##            vel_des_x = 0  
+##            vel_des_y = 0
+            A_l = 0.5
+#            A_v = 0.75
+#            A_t = 0.1
+#            
+#            perc_mutation = 0.75
+#            mutation_chance = 0.75
+#            
 #            A_f = 2
 #            A_f, A_l, A_t, A_v = [0.5,0.01,0.426522442525838,0.7690407264472648]
 #            perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance = [0.18,0.12,0.1,0.82,0.13]
             
+                        
         
         else:
             dimensions = 2
             loc_des_x = 100
             loc_des_y = 100*np.tan(60*np.pi/180)
-            vel_des = 0  
-            t_steps = 5
+            vel_des_x = 0  
+            vel_des_y = 0
+            t_steps = 10
             
-            pop_size = 100
+            pop_size = 5000
             A_l = 0.3
             A_v = 0.6
             A_f = 0
-            A_t = 0.2
+            A_t = 0.4
             
             ## Other Set Params
             perc_elite = 0.2
@@ -618,10 +656,10 @@ if __name__ == "__main__":
             mutation_chance = 0.4
             angle_mutation = 0.1
             
-            generations = 1000
+            generations = 500
             samples = 1
         
-        generation_stats = n_d_runfile(dimensions, loc_des_x, loc_des_y, vel_des, t_steps, pop_size, A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance, angle_mutation, samples, generations)
+        generation_stats, pop = n_d_runfile(dimensions, loc_des_x, loc_des_y, vel_des_x, vel_des_y, t_steps, pop_size, A_l, A_v, A_f, A_t, perc_elite, perc_lucky, perc_mutation, perc_selected, mutation_chance, angle_mutation, samples, generations)
     
 #        plt.figure(1000)
 #        plt.plot(pop_size,generation_stats[0],'.k')
