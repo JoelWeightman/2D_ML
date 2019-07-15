@@ -22,19 +22,53 @@ import random as rdm
 import matplotlib.pyplot as plt
 import scipy.integrate as integ
 
+def plot_actions(pop, acc, t_steps, dt, dimensions):
+    
+    v_x = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1],1))
+    v_y = np.zeros((np.shape(pop['actions'])[0],np.shape(pop['actions'])[1],1))
+    
+    v_x[:,1:t_steps,0] = np.cumsum(np.multiply(pop['actions'][:,:-1,0],acc*dt*np.cos(pop['actions'][:,:-1,1])), axis = 1)
+    v_y[:,1:t_steps,0] = np.cumsum(np.multiply(pop['actions'][:,:-1,0],acc*dt*np.sin(pop['actions'][:,:-1,1])), axis = 1)
+    
+    d_x = integ.cumtrapz(v_x, dx = dt, axis = 1, initial = 0)
+    d_y = integ.cumtrapz(v_y, dx = dt, axis = 1, initial = 0)
+    
+    best_index = 0
+    
+    plt.figure(2)
+    plt.clf()
+    plt.subplot(3,1,1)
+    plt.scatter(np.arange(np.size(pop['actions'][0,:,0])),np.sqrt(v_x[best_index,:,0]**2 + v_y[best_index,:,0]**2), s = 1,c='black')
+    plt.xlabel('Time')
+    plt.ylabel('Velocity')
+    plt.subplot(3,1,2)
+    plt.scatter(d_x[best_index,:,0],d_y[best_index,:,0], s = 1,c='black')
+    plt.xlabel('Distance_X')
+    plt.ylabel('Distance_Y')
+    plt.subplot(3,1,3)
+    plt.scatter(np.arange(np.size(pop['actions'][0,:,0])),pop['actions'][best_index,:,1]*180/np.pi, s = 1,c='black')
+    plt.scatter(np.arange(np.size(pop['actions'][0,:,0])),pop['actions'][best_index,:,0]*360, s = 1,c='red')
+    plt.xlabel('Time')
+    plt.ylabel('Angle')
+    plt.ylim(0,360)
+    plt.pause(0.001)
+    plt.draw()
+        
+    return
 
 def get_acceleration(dimensions, goal, dt, t_steps, ideal_time_perc):
  
     [x_final,u_final,y_final,v_final] = goal
     
     if dimensions == 1:
-        u_max = (x_final)/(dt*t_steps*ideal_time_perc/2)
+        u_max = (x_final)/(dt*t_steps*ideal_time_perc/2)+u_final
         u_acc = u_max/(dt*t_steps*ideal_time_perc/2)
         
     elif dimensions == 2:
-        u_max = np.sqrt(x_final**2 + y_final**2)/(dt*t_steps*ideal_time_perc/2)
+        u_max = np.sqrt(x_final**2 + y_final**2)/(dt*t_steps*ideal_time_perc/2)+u_final+v_final
         u_acc = u_max/(dt*t_steps*ideal_time_perc/2)
     
+    print(u_max)
     return u_max, u_acc          
 
 def initialise_population(dimensions, t_steps, pop_size, steps, deg_steps):
@@ -62,18 +96,16 @@ def initial_values(dimensions, actions, steps, deg_steps):
 
 def get_generation_nums(t_steps, pop_size, generation_weights):
     
-    elite_num = np.round(generation_weights[0]*pop_size).astype('int64')
-    lucky_num = np.round(generation_weights[1]*pop_size).astype('int64')
+    elite_num = 2#np.round(generation_weights[0]*pop_size).astype('int64')
+    lucky_num = 2#np.round(generation_weights[1]*pop_size).astype('int64')
+    
+    generation_weights[2:4] = generation_weights[2:4]/np.sum(generation_weights[2:4])*(pop_size-elite_num-lucky_num)/pop_size
+    
     children_num = (np.round(generation_weights[2]*pop_size/2)*2).astype('int64')
     mutation_num = np.round(generation_weights[3]*pop_size).astype('int64')
     
     if children_num < 2:
-        if elite_num > lucky_num and elite_num > 2:
-            elite_num -= children_num
-        elif mutation_num > elite_num and mutation_num > 2:
-            mutation_num -= children_num
-        else:
-            lucky_num -= children_num
+        mutation_num -= children_num
         children_num = 2
     
     mutated_gene_max = np.round(generation_weights[-1]*1000).astype('int64')
@@ -81,12 +113,7 @@ def get_generation_nums(t_steps, pop_size, generation_weights):
     if elite_num + lucky_num + children_num + mutation_num < pop_size:
         mutation_num += pop_size - (elite_num + lucky_num + children_num + mutation_num)
     elif elite_num + lucky_num + children_num + mutation_num > pop_size:
-        if elite_num > lucky_num and elite_num > 3:
-            elite_num += pop_size - (elite_num + lucky_num + children_num + mutation_num)
-        elif mutation_num > elite_num and mutation_num > 3:
-            mutation_num += pop_size - (elite_num + lucky_num + children_num + mutation_num)
-        else:
-            lucky_num += pop_size - (elite_num + lucky_num + children_num + mutation_num)
+        mutation_num += pop_size - (elite_num + lucky_num + children_num + mutation_num)
     
     generation_nums = np.array([elite_num,lucky_num,children_num,mutation_num,mutated_gene_max]).astype('int64')
     print(generation_nums)
@@ -156,14 +183,14 @@ def population_score(dimensions, pop, result_weights, goal, parameters):
 
     pop['score'] = (result_weights[0] - result_weights[0]*loc_val) + (result_weights[1] - result_weights[1]*vel_val)
     
-    fuel_sum = np.zeros(np.shape(pop['actions'][:,::-1,0]))
-    for i in range(dimensions):
-        fuel_sum += np.cumsum(np.abs(pop['actions'][:,::-1,i]), axis = 1)[:,::-1]
-    nonzero_length = np.argmin(fuel_sum, axis = 1)
-    
-    temp_fuel_score = (result_weights[-1] - result_weights[-1] * (nonzero_length) / (np.size(pop['actions'],1)))
-    temp_fuel_score[temp_fuel_score > (1-ideal_time_perc)*result_weights[-1]] = (1-ideal_time_perc)*result_weights[-1]
-    pop['score'] += temp_fuel_score
+#    fuel_sum = np.zeros(np.shape(pop['actions'][:,::-1,0]))
+#    for i in range(dimensions):
+#        fuel_sum += np.cumsum(np.abs(pop['actions'][:,::-1,i]), axis = 1)[:,::-1]
+#    nonzero_length = np.argmin(fuel_sum, axis = 1)
+#    
+#    temp_fuel_score = (result_weights[-1] - result_weights[-1] * (nonzero_length) / (np.size(pop['actions'],1)))
+#    temp_fuel_score[temp_fuel_score > (1-ideal_time_perc)*result_weights[-1]] = (1-ideal_time_perc)*result_weights[-1]
+#    pop['score'] += temp_fuel_score
 
     pop['score'] /= np.sum(result_weights)
     
@@ -251,11 +278,11 @@ def run_GA_result(inputs, dimensions, goal, GA_parameters, parameters, generatio
         list_2 = np.linspace(-0.5,0.5,step_size)/step_size**iteration+centre_values[1]
         list_2[list_2 <= epsilon] = epsilon
         list_2[list_2 >= (1-epsilon)] = (1-epsilon)
-        list_3 = np.linspace(-0.5,0.5,step_size)/step_size**iteration+centre_values[2]
-        list_3[list_3 <= epsilon] = epsilon
-        list_3[list_3 >= (1-epsilon)] = (1-epsilon)
+        list_3 = np.array([0])#np.linspace(-0.5,0.5,step_size)/step_size**iteration+centre_values[2]
+#        list_3[list_3 <= epsilon] = epsilon
+#        list_3[list_3 >= (1-epsilon)] = (1-epsilon)
           
-        scored = np.zeros((step_size,step_size,step_size))
+        scored = np.zeros((step_size,step_size,1))
         
         for I,i in enumerate(list_1):
             for J,j in enumerate(list_2):
@@ -266,8 +293,8 @@ def run_GA_result(inputs, dimensions, goal, GA_parameters, parameters, generatio
                     inputs = inputs/np.sum(inputs)
                     print(inputs)
                     pop, gen_count_stats = run_GA(dimensions, goal, GA_parameters, parameters, inputs, generation_weights, samples, steps, deg_steps, True)
-                    print(iteration,I,J,K,gen_count_stats[0])
-                    scored[I,J,K] = gen_count_stats[0]
+                    print(iteration,I,J,K,gen_count_stats[0],gen_count_stats[1])
+                    scored[I,J,K] = gen_count_stats[0] + 2*gen_count_stats[1]
         
         min_val_loc = np.where(scored == np.min(scored))
         centre_values = np.array([list_1[min_val_loc[0]],list_2[min_val_loc[1]],list_3[min_val_loc[2]]])
@@ -279,13 +306,13 @@ def run_GA_generation(inputs,dimensions, goal, GA_parameters, parameters, result
     centre_values = np.array([0.5,0.5,0.5,0.5,0.05])
     mutation_chance_max = 0.1
     for iteration in range(3):
-        step_size = 4
+        step_size = 5
         epsilon = 0.001
         
-        list_1 = np.linspace(-0.5,0.5,step_size)/step_size**iteration+centre_values[0]
+        list_1 = np.array([0.5])#np.linspace(-0.5,0.5,step_size)/step_size**iteration+centre_values[0]
         list_1[list_1 <= epsilon] = epsilon
         list_1[list_1 >= (1-epsilon)] = (1-epsilon)
-        list_2 = np.linspace(-0.5,0.5,step_size)/step_size**iteration+centre_values[1]
+        list_2 = np.array([0.5])# np.linspace(-0.5,0.5,step_size)/step_size**iteration+centre_values[1]
         list_2[list_2 <= epsilon] = epsilon
         list_2[list_2 >= (1-epsilon)] = (1-epsilon)
         list_3 = np.linspace(-0.5,0.5,step_size)/step_size**iteration+centre_values[2]
@@ -298,7 +325,7 @@ def run_GA_generation(inputs,dimensions, goal, GA_parameters, parameters, result
         list_5[list_5 <= epsilon] = epsilon
         list_5[list_5 >= (1-mutation_chance_max)] = (1-mutation_chance_max)
           
-        scored = np.zeros((step_size,step_size,step_size,step_size,step_size))
+        scored = np.zeros((1,1,step_size,step_size,step_size))
         
         for I,i in enumerate(list_1):
             for J,j in enumerate(list_2):
@@ -310,11 +337,11 @@ def run_GA_generation(inputs,dimensions, goal, GA_parameters, parameters, result
     #                            k1 = 0
                             inputs = np.array([i,j,k,m,n])
                 
-                            inputs[:-1] = inputs[:-1]/np.sum(inputs[:-1])
+#                            inputs[:-1] = inputs[:-1]/np.sum(inputs[:-1])
                             print(inputs)
                             pop, gen_count_stats = run_GA(dimensions, goal, GA_parameters, parameters, result_weights, inputs, samples, steps, deg_steps, True)
-                            print(iteration,I,J,K,M,N,gen_count_stats[0],)
-                            scored[I,J,K,M,N] = gen_count_stats[0]
+                            print(iteration,I,J,K,M,N,gen_count_stats[0],gen_count_stats[1])
+                            scored[I,J,K,M,N] = gen_count_stats[0] + 2*gen_count_stats[1]
         
         min_val_loc = np.where(scored == np.min(scored))
         centre_values = np.array([list_1[min_val_loc[0]],list_2[min_val_loc[1]],list_3[min_val_loc[2]],list_4[min_val_loc[3]],list_5[min_val_loc[4]]])
@@ -332,7 +359,7 @@ def run_GA(dimensions, goal, GA_parameters, parameters, result_weights, generati
 #        generation_nums[4] = 1
     
     theory_max = (np.sum(result_weights[:-1]) + result_weights[-1]*(1-ideal_time_perc))/(np.sum(result_weights))
-    thresh_perf = 0.0
+    thresh_perf = 1e-4
     
     stall_count = 0
     gen_count = np.zeros((2,samples))
@@ -341,7 +368,7 @@ def run_GA(dimensions, goal, GA_parameters, parameters, result_weights, generati
     for KK in range(samples):  # Count for samples
         start_time = time.time()
         pop = initialise_population(dimensions, t_steps, pop_size, steps, deg_steps)
-        old_best = np.copy(pop['actions'][0])
+        old_best = np.copy(pop['actions'][0,:,0]*pop['actions'][0,:,1])
         
         for I in range(max_gen):
             pop = population_results(dimensions, pop, dt, acc, t_steps)
@@ -349,7 +376,7 @@ def run_GA(dimensions, goal, GA_parameters, parameters, result_weights, generati
             pop, best_performance = pop_selection(pop, generation_nums, dimensions, steps, deg_steps)
 
             if running_ML == False:
-                if np.mod(I,max_gen/100) == 0 or I == 0:
+                if np.mod(I,max_gen/10) == 0 or I == 0:
                     print('t: %d, Pop: %d, Run: %1d, Max Perf: %3.3f' % (t_steps, pop_size, KK, theory_max))
     
                     if True:
@@ -358,6 +385,9 @@ def run_GA(dimensions, goal, GA_parameters, parameters, result_weights, generati
                         CS = plt.imshow(pop['actions'][:,:,0]*pop['actions'][:,:,1], aspect='auto')
                         plt.colorbar(CS)
                         plt.pause(0.01)
+                        
+                    if True:
+                        plot_actions(pop, acc, t_steps, dt, dimensions)
                         
                     if dimensions == 1:
                         print('Gen %1d Performance %3.3f, Distance = %3.1f, Velocity = %3.3f' % (I, best_performance[0], best_performance[1][0], best_performance[1][1]))
@@ -371,11 +401,10 @@ def run_GA(dimensions, goal, GA_parameters, parameters, result_weights, generati
                     elif dimensions == 2:
                         print('Gen %1d Performance %3.3f, Distance_x = %3.1f, Velocity_x = %3.1f, Distance_y = %3.3f, Velocity_y = %3.1f' % (I, best_performance[0], best_performance[1][0], best_performance[1][1], best_performance[1][2], best_performance[1][3]))
                 
-            if best_performance[0] == theory_max:#-thresh_perf*theory_max:
+            if best_performance[0] >= theory_max-thresh_perf*theory_max:
                     
                     sorted_pop = np.argsort(pop['score'])[::-1]
                     
-#                    pop['actions'] = pop['actions'][sorted_pop]
                     pop['results'] = pop['results'][sorted_pop]
                     pop['score'] = pop['score'][sorted_pop] 
                     
@@ -387,19 +416,19 @@ def run_GA(dimensions, goal, GA_parameters, parameters, result_weights, generati
                      
                     break
                 
-            elif np.array_equal(pop['actions'][0],old_best):
-                
-                stall_count += 1
-                if stall_count >= 10:
-                    generation_nums[-1] += 1
-                    stall_count = 0
-                    print('Mutation Chance Increased',generation_nums[-1])
-            else:
-                stall_count = 0
-                generation_nums[-1] = orig_mutation_chance
-
-                
-            old_best = np.copy(pop['actions'][0])
+#            elif np.array_equal(pop['actions'][0,:,0]*pop['actions'][0,:,1],old_best):
+#                
+#                stall_count += 1
+#                if stall_count >= 10:
+#                    generation_nums[-1] += 1
+#                    stall_count = 0
+#                    print('Mutation Chance Increased',generation_nums[-1])
+#            else:
+#                stall_count = 0
+#                generation_nums[-1] = orig_mutation_chance
+#
+#                
+#            old_best = np.copy(pop['actions'][0,:,0]*pop['actions'][0,:,1])
                     
                 
         elapsed_time = time.time() - start_time
@@ -423,7 +452,7 @@ def set_goal(dimensions):
         x_final = 100
         y_final = 100*np.tan(60*np.pi/180)
         u_final = 0
-        v_final = 0
+        v_final = 25
     
     return np.array([x_final, u_final, y_final, v_final])
 
@@ -431,22 +460,22 @@ def set_parameters(dimensions, goal):
     
     dt = 1.0
     ideal_time_perc = 0.8
-    t_steps = 10
+    t_steps = 20
     pop_size = 2000
-    max_gen = 10000
+    max_gen = 2000
     
     vel_max, acc = get_acceleration(dimensions, goal, dt, t_steps, ideal_time_perc)
     
-    x_weight = 0.001
-    u_weight = 0.001
-    t_weight = 0.38
+    x_weight = 0.5
+    u_weight = 0.5
+    t_weight = 0
     
     #0.00153374 0.00153374 0.99693252
     
     elite_weight = 0.001
     lucky_weight = 0.001
-    children_weight = 0.25
-    mutation_weight = 0.748
+    children_weight = 0.75
+    mutation_weight = 0.248
     mutation_chance = 0.025
     
     GA_parameters = np.array([int(t_steps), int(pop_size), int(max_gen)])
@@ -466,16 +495,16 @@ def set_parameters(dimensions, goal):
 if __name__ == "__main__":
     
     dimensions = 2
-    samples = 1
-    steps = 2
-    deg_steps = 15
+    samples = 10
+    steps = 10
+    deg_steps = 1
     
     goal = set_goal(dimensions)
         
     GA_parameters, parameters, result_weights, generation_weights = set_parameters(dimensions,goal)
     
     optimize_result_weights = False
-    optimize_generation_weights = False    
+    optimize_generation_weights = True    
     
     if optimize_result_weights == True:
         
