@@ -105,7 +105,7 @@ def get_generation_nums(t_steps, pop_size, generation_weights):
         mutation_num += pop_size - (elite_num + lucky_num + children_num + mutation_num)
     
     generation_nums = np.array([elite_num,lucky_num,children_num,mutation_num,mutated_gene_max]).astype('int64')
-    print(generation_nums)
+
     return generation_nums
 
 def population_results(dimensions, pop, dt, acc, t_steps, init_conds, const_conds):
@@ -123,8 +123,9 @@ def population_results(dimensions, pop, dt, acc, t_steps, init_conds, const_cond
         pop['results'] = np.concatenate((r, r_dot, theta, theta_dot), axis = 1)
 
     elif dimensions == 3:
+        
         r_dot, theta_dot, phi_dot, r, theta, phi = velocity_distance_3d(pop,dt,acc,t_steps,init_conds,const_conds)
-    
+        
         pop['results'] = np.concatenate((r, r_dot, theta, theta_dot, phi, phi_dot), axis = 1)
         
     return pop
@@ -232,11 +233,11 @@ def velocity_distance_3d(pop, dt, acc, t_steps, init_conds, const_conds):
         theta_cur = np.arctan2(d_y[:,i+1],d_x[:,i+1])
         phi_cur = np.arctan2(np.sqrt(d_x[:,i+1]**2+d_y[:,i+1]**2),d_z[:,i+1])
     
-    r_dot = (d_x[:,-1]*v_x[:,-1] + d_y[:,-1]*v_y[:,-1] + d_z[:,-1]*v_z[:,-1])/r_cur[:,0]
-    theta_dot = (d_x[:,-1]*v_y[:,-1] - d_y[:,-1]*v_x[:,-1])/(d_x[:,-1]**2)*np.cos(theta_cur[:,0])**2
-    phi_dot = (np.cos(phi_cur[:,0])**2*(d_x[:,-1]*d_z[:,-1]*v_x[:,-1]-
+    r_dot = (d_x[:,-1]*v_x[:,-1] + d_y[:,-1]*v_y[:,-1] + d_z[:,-1]*v_z[:,-1])/r_cur
+    theta_dot = (d_x[:,-1]*v_y[:,-1] - d_y[:,-1]*v_x[:,-1])/(d_x[:,-1]**2)*np.cos(theta_cur)**2
+    phi_dot = ((d_x[:,-1]*d_z[:,-1]*v_x[:,-1]-
             d_x[:,-1]**2*v_z[:,-1]+d_y[:,-1]*(d_z[:,-1]*v_y[:,-1]-
-            d_y[:,-1]*v_z[:,-1]))/(d_z[:,-1]**2*np.sqrt(d_x[:,-1]**2+d_y[:,-1]**2)))
+            d_y[:,-1]*v_z[:,-1]))/(d_z[:,-1]**2*np.sqrt(d_x[:,-1]**2+d_y[:,-1]**2))*np.cos(phi_cur)**2)
     
     
     return r_dot, theta_dot, phi_dot, r_cur, theta_cur, phi_cur
@@ -244,13 +245,11 @@ def velocity_distance_3d(pop, dt, acc, t_steps, init_conds, const_conds):
 def population_score(dimensions, pop, result_weights, goal, parameters):
 
     [acc, dt] = parameters
-    
-    ###### Fix these scales
-    
+       
     radial_scale = 1
     radial_vel_scale = 0.1
     angle_scale = 1*np.pi/180
-    angle_vel_scale = 1*np.pi/180
+    angle_vel_scale = 0.1*np.pi/180
     
     pop['actions'][:,-1,:] = 0.0
     
@@ -281,8 +280,8 @@ def population_score(dimensions, pop, result_weights, goal, parameters):
         radial_vel_val = np.abs(pop['results'][:,1] - goal[1])/radial_vel_scale
         
         theta_angle_val = np.abs(pop['results'][:,2] - goal[2])/angle_scale
-        phi_angle_val = np.abs(pop['results'][:,4] - goal[4])/angle_scale
         theta_angle_vel_val = np.abs(pop['results'][:,3] - goal[3])/angle_vel_scale
+        phi_angle_val = np.abs(pop['results'][:,4] - goal[4])/angle_scale
         phi_angle_vel_val = np.abs(pop['results'][:,5] - goal[5])/angle_vel_scale
         
         pop['score'] = (
@@ -292,40 +291,13 @@ def population_score(dimensions, pop, result_weights, goal, parameters):
             (result_weights[3] - result_weights[3]*theta_angle_vel_val) +
             (result_weights[4] - result_weights[4]*phi_angle_val) +
             (result_weights[5] - result_weights[5]*phi_angle_vel_val))
-            
-#    loc_val = np.zeros((np.shape(pop['results'])[0]))
-#    vel_val = np.zeros((np.shape(pop['results'])[0]))
-#    goal_loc_val = np.zeros((np.shape(pop['results'])[0]))
-#
-#    for dim in np.arange(0,dimensions+1,2):
-#        
-#        loc_val += (pop['results'][:,dim] - goal[dim])**2
-#        goal_loc_val += goal[dim]**2
-#        
-#        vel_val += np.abs(pop['results'][:,dim+1] - goal[dim+1])
-#        
-#    goal_vel_val = 
-# 
-#    loc_val = np.sqrt(loc_val) / np.sqrt(goal_loc_val)
-#    vel_val = (vel_val) / (goal_vel_val)
-
-#    pop['score'] = (result_weights[0] - result_weights[0]*loc_val) + (result_weights[1] - result_weights[1]*vel_val)
-    
-#    fuel_sum = np.zeros(np.shape(pop['actions'][:,::-1,0]))
-#    for i in range(dimensions):
-#        fuel_sum += np.cumsum(np.abs(pop['actions'][:,::-1,i]), axis = 1)[:,::-1]
-#    nonzero_length = np.argmin(fuel_sum, axis = 1)
-#    
-#    temp_fuel_score = (result_weights[-1] - result_weights[-1] * (nonzero_length) / (np.size(pop['actions'],1)))
-#    temp_fuel_score[temp_fuel_score > (1-ideal_time_perc)*result_weights[-1]] = (1-ideal_time_perc)*result_weights[-1]
-#    pop['score'] += temp_fuel_score
 
     pop['score'] /= np.sum(result_weights)
     
     return pop
 
 def pop_selection(pop, generation_nums, dimensions, steps, deg_steps):
-    
+     
     sorted_pop = np.argsort(pop['score'])[::-1]
 
     if generation_nums[0] == 0:
@@ -351,6 +323,7 @@ def pop_selection(pop, generation_nums, dimensions, steps, deg_steps):
     actions = pop['actions'][np.concatenate((elite_pop,lucky_pop)).astype('int64')]
 
     pop = generate_children(pop, actions, generation_nums, selected_pop, mutated_pop, dimensions, steps, deg_steps)
+
     
     return pop, np.array([np.array(pop['score'][sorted_pop[0]]),pop['results'][sorted_pop[0]],sorted_pop[0]])
     
@@ -712,7 +685,7 @@ if __name__ == "__main__":
     
     dimensions = 3
     samples = 1
-    vel_steps = 10
+    vel_steps = 4
     deg_steps = 12
     
     goal = set_goal(dimensions)
