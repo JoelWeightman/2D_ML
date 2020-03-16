@@ -455,10 +455,10 @@ def set_goal(dimensions):
         u_final = 0
         v_final = 0
     elif dimensions == 2:
-        x_final = 0
-        y_final = 0
+        x_final = 100
+        y_final = 100
         u_final = 0
-        v_final = 5
+        v_final = 0
     elif dimensions == 3:
         x_final = 0
         y_final = 0
@@ -508,8 +508,8 @@ if __name__ == "__main__":
     
     dimensions = 2
     samples = 1
-    steps = 10
-    deg_steps = 1
+    steps = 5
+    deg_steps = 5
     
     goal = set_goal(dimensions)
         
