@@ -345,10 +345,10 @@ def population_score(dimensions, pop, result_weights, goal, parameters):
 
     [acc, dt] = parameters
        
-    radial_scale = 1000
-    radial_vel_scale = 10
-    angle_scale = 0.1*np.pi/180
-    angle_vel_scale = 1e-7*np.pi/180
+    radial_scale = 1e6
+    radial_vel_scale = 100
+    angle_scale = 0.01
+    angle_vel_scale = 100/1e6*np.pi/180
     
     pop['actions'][:,-1,:] = 0.0
     
@@ -362,14 +362,16 @@ def population_score(dimensions, pop, result_weights, goal, parameters):
 
         
     elif dimensions == 2:
-        radial_val = np.abs(pop['results'][:,0] - goal[0])/radial_scale
-        radial_vel_val = np.abs(pop['results'][:,1] - goal[1])/radial_vel_scale
+        radial_val = np.log10(np.abs(pop['results'][:,0] - goal[0])/radial_scale+1.0)
+        radial_vel_val = np.log10(np.abs(pop['results'][:,1] - goal[1])/radial_vel_scale + 1.0)
+                
+        angle_val = np.log10(np.abs(pop['results'][:,2] - goal[2])/angle_scale + 1.0)
+        angle_vel_val = np.log10(np.abs(pop['results'][:,3] - goal[3])/angle_vel_scale + 1.0)
         
         radial_val[radial_val > 1] = 1
         radial_vel_val[radial_vel_val > 1] = 1
-        
-        angle_val = np.abs(pop['results'][:,2] - goal[2])/angle_scale
-        angle_vel_val = np.abs(pop['results'][:,3] - goal[3])/angle_vel_scale
+        angle_val[angle_val > 1] = 1
+        angle_vel_val[angle_vel_val > 1] = 1
         
         pop['score'] = (
             (result_weights[0] - result_weights[0]*radial_val) + 
@@ -431,9 +433,7 @@ def pop_selection(pop, generation_nums, dimensions, steps, deg_steps):
     
 def generate_children(pop, actions, generation_nums, selected_pop, mutated_pop, dimensions, steps, deg_steps):
 
-    
-
-    
+   
     if selected_pop.size != 0:
         ## Cross Over Children
         random_selection_children_0 = np.random.randint(1,np.size(pop['actions'], axis = 1)-1, size = generation_nums[2])
@@ -752,10 +752,10 @@ def constant_conditions(dimensions, G, M_E, R_E):
 
 def set_parameters(dimensions, goal):
     
-    dt = 100.0
-    t_steps = 1000
+    dt = 50.0
+    t_steps = 100
     pop_size = 50
-    max_gen = 2
+    max_gen = 100
     
     mass = 200
     thrust = 50000

@@ -345,10 +345,10 @@ def population_score(dimensions, pop, result_weights, goal, parameters):
 
     [acc, dt] = parameters
        
-    radial_scale = 1000
-    radial_vel_scale = 10
-    angle_scale = 0.1*np.pi/180
-    angle_vel_scale = 1e-7*np.pi/180
+    radial_scale = 1e6
+    radial_vel_scale = 100
+    angle_scale = 0.01
+    angle_vel_scale = 100/1e6*np.pi/180
     
     pop['actions'][:,-1,:] = 0.0
     
@@ -362,14 +362,16 @@ def population_score(dimensions, pop, result_weights, goal, parameters):
 
         
     elif dimensions == 2:
-        radial_val = np.abs(pop['results'][:,0] - goal[0])/radial_scale
-        radial_vel_val = np.abs(pop['results'][:,1] - goal[1])/radial_vel_scale
+        radial_val = np.log10(np.abs(pop['results'][:,0] - goal[0])/radial_scale+1.0)
+        radial_vel_val = np.log10(np.abs(pop['results'][:,1] - goal[1])/radial_vel_scale + 1.0)
+                
+        angle_val = np.log10(np.abs(pop['results'][:,2] - goal[2])/angle_scale + 1.0)
+        angle_vel_val = np.log10(np.abs(pop['results'][:,3] - goal[3])/angle_vel_scale + 1.0)
         
         radial_val[radial_val > 1] = 1
         radial_vel_val[radial_vel_val > 1] = 1
-        
-        angle_val = np.abs(pop['results'][:,2] - goal[2])/angle_scale
-        angle_vel_val = np.abs(pop['results'][:,3] - goal[3])/angle_vel_scale
+        angle_val[angle_val > 1] = 1
+        angle_vel_val[angle_vel_val > 1] = 1
         
         pop['score'] = (
             (result_weights[0] - result_weights[0]*radial_val) + 
@@ -402,27 +404,11 @@ def pop_selection(pop, generation_nums, dimensions, steps, deg_steps):
      
     sorted_pop = np.argsort(pop['score'])[::-1]
 
-    if generation_nums[0] == 0:
-        elite_pop = np.array([])
-    else:
-        elite_pop = sorted_pop[:generation_nums[0]]
-        
-    if generation_nums[2] == 0:
-        selected_pop = np.array([])
-    else:
-        selected_pop = sorted_pop[:generation_nums[2]]
-        
-    if generation_nums[1] == 0:       
-        lucky_pop = np.array([])
-    else:
-        lucky_pop = np.random.choice(sorted_pop[:],size = generation_nums[1], replace = False)
-        
-    if generation_nums[3] == 0:
-        mutated_pop = np.array([])
-    else:
-        mutated_pop = np.random.choice(sorted_pop[:],size = generation_nums[3], replace = False)
-
-    actions = pop['actions'][np.concatenate((elite_pop,lucky_pop)).astype('int64')]
+    actions = pop['actions']
+    
+    
+    
+    ###### FIX ALL THIS...
 
     pop = generate_children(pop, actions, generation_nums, selected_pop, mutated_pop, dimensions, steps, deg_steps)
 
@@ -431,25 +417,23 @@ def pop_selection(pop, generation_nums, dimensions, steps, deg_steps):
     
 def generate_children(pop, actions, generation_nums, selected_pop, mutated_pop, dimensions, steps, deg_steps):
 
-    
-
-    
+   
     if selected_pop.size != 0:
         ## Cross Over Children
         random_selection_children_0 = np.random.randint(1,np.size(pop['actions'], axis = 1)-1, size = generation_nums[2])
         selected_pop_0 = np.random.choice(selected_pop, size = int(len(selected_pop)/2), replace = False).astype('int64')
         selected_pop_1 = np.setdiff1d(selected_pop, selected_pop_0).astype('int64')
         
-        children_actions_0 = pop['actions'][selected_pop,:,:]
+        children_actions = pop['actions'][selected_pop,:,:]
         
         for i in range(np.size(selected_pop_0,0)):
-            children_actions_0[i,:,:] = np.concatenate((pop['actions'][selected_pop_0[i],:random_selection_children_0[i],:],pop['actions'][selected_pop_1[i],random_selection_children_0[i]:,:]),axis = 0)
-            children_actions_0[i+np.size(selected_pop_0,0),:,:] = np.concatenate((pop['actions'][selected_pop_1[i],:random_selection_children_0[i],:],pop['actions'][selected_pop_0[i],random_selection_children_0[i]:,:]),axis = 0)
-            
+            children_actions[i,:,:] = np.concatenate((pop['actions'][selected_pop_0[i],:random_selection_children_0[i],:],pop['actions'][selected_pop_1[i],random_selection_children_0[i]:,:]),axis = 0)
+            children_actions[i+np.size(selected_pop_0,0),:,:] = np.concatenate((pop['actions'][selected_pop_1[i],:random_selection_children_0[i],:],pop['actions'][selected_pop_0[i],random_selection_children_0[i]:,:]),axis = 0)
+      
     ### Mutate Children
+    
+    mutated_actions = children_actions
     if mutated_pop.size != 0:
-        mutated_actions = children_actions_0
-        
         threshold_values = np.random.rand(np.shape(mutated_actions)[0],np.shape(mutated_actions)[1],np.shape(mutated_actions)[2])
         indices = np.where(threshold_values <= generation_nums[-1]/1000)
         
@@ -464,12 +448,7 @@ def generate_children(pop, actions, generation_nums, selected_pop, mutated_pop, 
             elif indices[2][i] == 2:
                 mutated_actions[indices[0][i],indices[1][i],indices[2][i]] = np.random.randint(0, deg_steps + 1, size = 1)*180/deg_steps*(np.pi/180)
             
-    
-    if mutated_pop.size == 0:
-        pop['actions'] = np.concatenate((actions,children_actions_0), axis = 0)
-        
-    else:
-        pop['actions'] = np.concatenate((actions,mutated_actions), axis = 0)
+    pop['actions'] = np.concatenate((actions,mutated_actions), axis = 0)
 #    else:
 #        pop['actions'] = np.concatenate((actions,children_actions_0,mutated_actions), axis = 0)
 #    
@@ -752,10 +731,10 @@ def constant_conditions(dimensions, G, M_E, R_E):
 
 def set_parameters(dimensions, goal):
     
-    dt = 100.0
-    t_steps = 1000
+    dt = 50.0
+    t_steps = 100
     pop_size = 50
-    max_gen = 2
+    max_gen = 100
     
     mass = 200
     thrust = 50000
